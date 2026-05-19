@@ -26,6 +26,9 @@
     ul { padding-left:22px; }
     code { background:#eef4f1; padding:2px 6px; border-radius:4px; }
     .note { border-left:6px solid var(--blue); background:#fff; padding:16px 18px; border-radius:8px; }
+    .links { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
+    .links a { display:inline-block; background:var(--green); color:#fff; text-decoration:none; border-radius:8px; padding:10px 14px; font-weight:700; }
+    .links a.secondary { background:var(--blue); }
     footer { color:var(--muted); border-top:1px solid var(--line); margin-top:34px; padding-top:18px; }
     @media (max-width:780px) { .grid,.two { grid-template-columns:1fr; } main { padding:28px 16px 42px; } }
   </style>
@@ -75,6 +78,11 @@
   <section class="note">
     <h2>Public Scope</h2>
     <p>這個 GitHub 版本保留架構、介面概念與教學說明；不包含真實登入狀態、NotebookLM cookie、私有 notebook id、使用者本機絕對路徑或實際資料檔。</p>
+    <div class="links">
+      <a href="docs/refactor_notes.html">Open Refactor Notes</a>
+      <a class="secondary" href="README.md">Open README</a>
+      <a class="secondary" href="examples/sample_command_package_upload_folder.json">Command Package Example</a>
+    </div>
   </section>
 
   <footer>AI NotebookLM Runtime Lab · v1.01 · public overview</footer>

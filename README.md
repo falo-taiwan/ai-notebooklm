@@ -4,6 +4,12 @@
 
 公開版重點放在架構與方法，不放真實帳號、Notebook ID、cookie、本機絕對路徑或實際資料。
 
+## Public Page
+
+- GitHub Pages: <https://falo-chinese.github.io/ai-notebooklm/>
+- Refactor Notes: <https://falo-chinese.github.io/ai-notebooklm/docs/refactor_notes.html>
+- Command Package Example: <https://falo-chinese.github.io/ai-notebooklm/examples/sample_command_package_upload_folder.json>
+
 ## 核心概念
 
 - HTML portal 是操作入口，不是核心。
