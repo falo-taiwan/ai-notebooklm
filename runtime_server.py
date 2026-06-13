@@ -2326,8 +2326,124 @@ def make_handler(config: AppConfig):
                     import traceback
                     traceback.print_exc()
                     self._send_json({"ok": False, "error": str(e)})
+            elif parsed.path == "/api/multichat/ask":
+                content_length = int(self.headers.get("Content-Length", 0))
+                post_data = self.rfile.read(content_length).decode("utf-8")
+                from urllib.parse import parse_qs
+                params = parse_qs(post_data)
+                notebook_id = params.get("notebook_id", [""])[0].strip()
+                user_name = params.get("user_name", [""])[0].strip()
+                conversation_id = params.get("conversation_id", [""])[0].strip()
+                question = params.get("question", [""])[0].strip()
+
+                if not notebook_id or not user_name or not question:
+                    self._send_json({"ok": False, "error": "Notebook ID, User Name, and Question are required."})
+                    return
+
+                import sys
+                import subprocess
+                import json
+                
+                helper_path = Path(config.project_root) / "ask_helper.py"
+                cmd = [sys.executable, str(helper_path), "-n", notebook_id, "-q", question]
+                if conversation_id and conversation_id != "new":
+                    cmd.extend(["-c", conversation_id])
+                
+                try:
+                    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+                    if result.returncode != 0:
+                        self._send_json({"ok": False, "error": f"Helper execution failed: {result.stderr or result.stdout}"})
+                        return
+
+                    try:
+                        result_data = json.loads(result.stdout)
+                    except Exception as je:
+                        self._send_json({"ok": False, "error": f"Failed to parse helper output: {result.stdout}, err: {str(je)}"})
+                        return
+                    
+                    if not result_data.get("ok"):
+                        self._send_json({"ok": False, "error": result_data.get("error", "Unknown helper error")})
+                        return
+
+                    answer = result_data["answer"]
+                    resolved_conv_id = result_data["conversation_id"]
+
+                    sessions_file = Path(config.project_root) / "data" / "multichat_sessions.json"
+                    import datetime
+                    
+                    data = {"sessions": {}}
+                    if sessions_file.exists():
+                        try:
+                            with open(sessions_file, "r", encoding="utf-8") as f:
+                                data = json.load(f)
+                        except Exception:
+                            pass
+                    
+                    if "sessions" not in data:
+                        data["sessions"] = {}
+                        
+                    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    if resolved_conv_id not in data["sessions"]:
+                        data["sessions"][resolved_conv_id] = {
+                            "user_name": user_name,
+                            "notebook_id": notebook_id,
+                            "created_at": now_str,
+                            "last_query_at": now_str,
+                            "turns": []
+                        }
+                    else:
+                        data["sessions"][resolved_conv_id]["last_query_at"] = now_str
+                        data["sessions"][resolved_conv_id]["user_name"] = user_name
+                        
+                    data["sessions"][resolved_conv_id]["turns"].append({
+                        "role": "user",
+                        "content": question,
+                        "timestamp": now_str
+                    })
+                    data["sessions"][resolved_conv_id]["turns"].append({
+                        "role": "assistant",
+                        "content": answer,
+                        "timestamp": now_str
+                    })
+                    
+                    with open(sessions_file, "w", encoding="utf-8") as f:
+                        json.dump(data, f, ensure_ascii=False, indent=2)
+
+                    self._send_json({
+                        "ok": True,
+                        "answer": answer,
+                        "conversation_id": resolved_conv_id
+                    })
+                except Exception as e:
+                    self._send_json({"ok": False, "error": str(e)})
+            elif parsed.path == "/api/multichat/delete":
+                content_length = int(self.headers.get("Content-Length", 0))
+                post_data = self.rfile.read(content_length).decode("utf-8")
+                from urllib.parse import parse_qs
+                params = parse_qs(post_data)
+                conversation_id = params.get("conversation_id", [""])[0].strip()
+
+                if not conversation_id:
+                    self._send_json({"ok": False, "error": "Conversation ID is required."})
+                    return
+
+                sessions_file = Path(config.project_root) / "data" / "multichat_sessions.json"
+                if sessions_file.exists():
+                    try:
+                        with open(sessions_file, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                        if "sessions" in data and conversation_id in data["sessions"]:
+                            del data["sessions"][conversation_id]
+                            with open(sessions_file, "w", encoding="utf-8") as f:
+                                json.dump(data, f, ensure_ascii=False, indent=2)
+                    except Exception:
+                        pass
+                
+                self._send_json({"ok": True})
             else:
                 self.send_error(404, "Not found")
+
 
         def do_GET(self) -> None:
             if not self._network_allowed():
@@ -2529,8 +2645,54 @@ def make_handler(config: AppConfig):
                 self._send_html(render_command_result("Import Disabled", {"ok": False, "mode": "import_disabled", "error": "Import is intentionally disabled in v1.01 MVP. Export-only keeps the teaching runtime safer."}))
             elif parsed.path == "/docs/refactor_notes.html":
                 self._send_file(PROJECT_ROOT / "docs" / "refactor_notes.html", "text/html; charset=utf-8")
+            elif parsed.path == "/api/multichat/sessions":
+                sessions_file = Path(config.project_root) / "data" / "multichat_sessions.json"
+                import json
+                sessions_list = []
+                if sessions_file.exists():
+                    try:
+                        with open(sessions_file, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                        for cid, info in data.get("sessions", {}).items():
+                            last_q = ""
+                            if info.get("turns"):
+                                for turn in reversed(info["turns"]):
+                                    if turn.get("role") == "user":
+                                        last_q = turn.get("content", "")
+                                        break
+                            sessions_list.append({
+                                "conversation_id": cid,
+                                "user_name": info.get("user_name", "Unknown"),
+                                "notebook_id": info.get("notebook_id", ""),
+                                "created_at": info.get("created_at", ""),
+                                "last_query_at": info.get("last_query_at", ""),
+                                "last_question": last_q
+                            })
+                    except Exception:
+                        pass
+                sessions_list.sort(key=lambda x: x["last_query_at"], reverse=True)
+                self._send_json({"ok": True, "sessions": sessions_list})
+            elif parsed.path == "/api/multichat/history":
+                params = parse_qs(parsed.query)
+                conversation_id = params.get("conversation_id", [""])[0].strip()
+                if not conversation_id:
+                    self._send_json({"ok": False, "error": "Conversation ID is required."})
+                    return
+                sessions_file = Path(config.project_root) / "data" / "multichat_sessions.json"
+                import json
+                turns = []
+                if sessions_file.exists():
+                    try:
+                        with open(sessions_file, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                        if "sessions" in data and conversation_id in data["sessions"]:
+                            turns = data["sessions"][conversation_id].get("turns", [])
+                    except Exception:
+                        pass
+                self._send_json({"ok": True, "turns": turns})
             else:
                 self.send_error(404, "Not found")
+
 
         def log_message(self, format: str, *args: object) -> None:
             print(f"[portal] {self.address_string()} - {format % args}")
@@ -2724,6 +2886,7 @@ def render_index(payload: Dict[str, object]) -> str:
       const saved = localStorage.getItem('falo_etl_active_tab') || 'tab-simple-upload';
       const button = document.querySelector(`[data-tab="${{saved}}"]`) || document.querySelector('[data-tab="tab-simple-upload"]');
       if (button) switchTab(button.dataset.tab, button);
+      loadSessions();
     }});
     function toggleTypes(formId, checked) {{
       document.querySelectorAll(`#${{formId}} input[name="types"]`).forEach(item => item.checked = checked);
@@ -2813,7 +2976,200 @@ def render_index(payload: Dict[str, object]) -> str:
         btn.classList.remove('is-running');
       }}
     }}
+
+    async function loadSessions() {{
+      try {{
+        const response = await fetch('/api/multichat/sessions');
+        const res = await response.json();
+        if (res.ok) {{
+          const select = document.getElementById('chat_session_select');
+          select.innerHTML = '<option value="new">-- 開啟全新對話 (Create New Chat) --</option>';
+          
+          res.sessions.forEach(s => {{
+            const opt = document.createElement('option');
+            opt.value = s.conversation_id;
+            opt.textContent = `${{s.user_name}} (${{s.created_at}}) - ${{s.last_question.substring(0, 30)}}...`;
+            select.appendChild(opt);
+          }});
+          
+          const tbody = document.getElementById('admin_sessions_table_body');
+          if (res.sessions.length === 0) {{
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:#66706b;">尚無地端對話紀錄</td></tr>';
+          }} else {{
+            let html = '';
+            res.sessions.forEach(s => {{
+              html += `
+                <tr>
+                  <td style="padding:10px; border:1px solid #d8ddd8;"><strong>${{escapeHtml(s.user_name)}}</strong></td>
+                  <td style="padding:10px; border:1px solid #d8ddd8;"><code style="font-size:12px;">${{s.conversation_id}}</code></td>
+                  <td style="padding:10px; border:1px solid #d8ddd8; font-size:14px; max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${{escapeHtml(s.last_question)}}">${{escapeHtml(s.last_question)}}</td>
+                  <td style="padding:10px; border:1px solid #d8ddd8; font-size:13px; color:#66706b;">${{s.last_query_at}}</td>
+                  <td style="padding:10px; border:1px solid #d8ddd8;">
+                    <a class="button secondary" style="padding:4px 8px; font-size:12px;" href="#" onclick="selectSessionFromTable('${{s.conversation_id}}', '${{escapeHtml(s.user_name)}}'); return false;">載入對話</a>
+                    <a class="button danger" style="padding:4px 8px; font-size:12px; background:#d9534f;" href="#" onclick="if(confirm('確定要刪除此地端對話紀錄嗎？雲端不會自動刪除。')){{deleteSession('${{s.conversation_id}}');}} return false;">刪除</a>
+                  </td>
+                </tr>
+              `;
+            }});
+            tbody.innerHTML = html;
+          }}
+        }}
+      }} catch (err) {{
+        console.error('Failed to load sessions:', err);
+      }}
+    }}
+    
+    function escapeHtml(string) {{
+      const map = {{
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      }};
+      return String(string).replace(/[&<>"']/g, function(m) {{ return map[m]; }});
+    }}
+
+    async function selectSessionFromTable(convId, userName) {{
+      document.getElementById('chat_session_select').value = convId;
+      document.getElementById('chat_user_name').value = userName;
+      await loadSessionHistory(convId);
+    }}
+
+    async function onSessionSelectChange() {{
+      const select = document.getElementById('chat_session_select');
+      const convId = select.value;
+      if (convId === 'new') {{
+        document.getElementById('chat_box_conversation').innerHTML = '<div style="color:#66706b; text-align:center; margin-top:100px;">請選擇對話或輸入問題開始問答</div>';
+      }} else {{
+        await loadSessionHistory(convId);
+      }}
+    }}
+
+    async function loadSessionHistory(convId) {{
+      const chatBox = document.getElementById('chat_box_conversation');
+      chatBox.innerHTML = '<div style="color:#66706b; text-align:center; margin-top:100px;">載入對話歷史中...</div>';
+      try {{
+        const response = await fetch(`/api/multichat/history?conversation_id=${{encodeURIComponent(convId)}}`);
+        const res = await response.json();
+        if (res.ok && res.turns) {{
+          if (res.turns.length === 0) {{
+            chatBox.innerHTML = '<div style="color:#66706b; text-align:center; margin-top:100px;">無對話內容</div>';
+            return;
+          }}
+          let html = '';
+          res.turns.forEach(t => {{
+            const isUser = t.role === 'user';
+            const bg = isUser ? '#e8f1ed' : '#ffffff';
+            const align = isUser ? 'flex-end' : 'flex-start';
+            const color = isUser ? '#174f43' : '#2c302e';
+            const border = isUser ? '1px solid #9fd6b5' : '1px solid #d8ddd8';
+            html += `
+              <div style="display:flex; justify-content:${{align}}; margin-bottom:10px;">
+                <div style="max-width:85%; background:${{bg}}; color:${{color}}; border:${{border}}; padding:10px 14px; border-radius:10px; font-size:14px; white-space:pre-wrap; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                  <div style="font-size:11px; color:#66706b; margin-bottom:4px; font-weight:bold;">${{isUser ? 'USER' : 'NOTEBOOKLM'}} - ${{t.timestamp}}</div>
+                  ${{escapeHtml(t.content)}}
+                </div>
+              </div>
+            `;
+          }});
+          chatBox.innerHTML = html;
+          chatBox.scrollTop = chatBox.scrollHeight;
+        }}
+      }} catch (err) {{
+        chatBox.innerHTML = `<div style="color:#9d2f2f; text-align:center; margin-top:100px;">載入失敗: ${{escapeHtml(err.message)}}</div>`;
+      }}
+    }}
+
+    async function sendChatMessage() {{
+      const btn = document.getElementById('btn_send_chat');
+      const notebookId = document.getElementById('chat_notebook_id').value.trim();
+      const userName = document.getElementById('chat_user_name').value.trim();
+      const sessionSelect = document.getElementById('chat_session_select');
+      const conversationId = sessionSelect.value;
+      const question = document.getElementById('chat_question').value.trim();
+
+      if (!notebookId || !userName || !question) {{
+        alert('請填寫 Notebook ID、姓名與提問內容。');
+        return;
+      }}
+
+      btn.disabled = true;
+      const originalText = btn.textContent;
+      btn.textContent = 'Querying NotebookLM (5~8s)...';
+      btn.classList.add('is-running');
+
+      const chatBox = document.getElementById('chat_box_conversation');
+      if (chatBox.querySelector('div[style*="text-align:center"]')) {{
+        chatBox.innerHTML = '';
+      }}
+
+      const tempUserBubble = document.createElement('div');
+      tempUserBubble.style.display = 'flex';
+      tempUserBubble.style.justifyContent = 'flex-end';
+      tempUserBubble.style.marginBottom = '10px';
+      tempUserBubble.innerHTML = `
+        <div style="max-width:85%; background:#e8f1ed; color:#174f43; border:1px solid #9fd6b5; padding:10px 14px; border-radius:10px; font-size:14px; white-space:pre-wrap; opacity:0.7;">
+          <div style="font-size:11px; color:#66706b; margin-bottom:4px; font-weight:bold;">USER (傳送中...)</div>
+          ${{escapeHtml(question)}}
+        </div>
+      `;
+      chatBox.appendChild(tempUserBubble);
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      try {{
+        const response = await fetch('/api/multichat/ask', {{
+          method: 'POST',
+          headers: {{
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }},
+          body: `notebook_id=${{encodeURIComponent(notebookId)}}&user_name=${{encodeURIComponent(userName)}}&conversation_id=${{encodeURIComponent(conversationId)}}&question=${{encodeURIComponent(question)}}`
+        }});
+        
+        const res = await response.json();
+        if (res.ok) {{
+          document.getElementById('chat_question').value = '';
+          await loadSessions();
+          document.getElementById('chat_session_select').value = res.conversation_id;
+          await loadSessionHistory(res.conversation_id);
+        }} else {{
+          alert('發問失敗：' + (res.error || '未知錯誤'));
+          tempUserBubble.remove();
+        }}
+      }} catch (err) {{
+        alert('請求錯誤：' + err.message);
+        tempUserBubble.remove();
+      }} finally {{
+        btn.disabled = false;
+        btn.textContent = originalText;
+        btn.classList.remove('is-running');
+      }}
+    }}
+
+    async function deleteSession(convId) {{
+      try {{
+        const response = await fetch('/api/multichat/delete', {{
+          method: 'POST',
+          headers: {{
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }},
+          body: `conversation_id=${{encodeURIComponent(convId)}}`
+        }});
+        const res = await response.json();
+        if (res.ok) {{
+          const select = document.getElementById('chat_session_select');
+          if (select.value === convId) {{
+            select.value = 'new';
+            document.getElementById('chat_box_conversation').innerHTML = '<div style="color:#66706b; text-align:center; margin-top:100px;">請選擇對話或輸入問題開始問答</div>';
+          }}
+          await loadSessions();
+        }}
+      }} catch (err) {{
+        alert('刪除失敗：' + err.message);
+      }}
+    }}
   </script>
+
 </head>
 <body>
 <main>
@@ -2856,6 +3212,7 @@ def render_index(payload: Dict[str, object]) -> str:
     <button class="tab-button" data-tab="tab-gas-cloud" onclick="switchTab('tab-gas-cloud', this)">Tab 6 GAS Cloud</button>
     <button class="tab-button" data-tab="tab-incoming-watch" onclick="switchTab('tab-incoming-watch', this)">Tab 7 Incoming Watch</button>
     <button class="tab-button" data-tab="tab-meeting-converter" onclick="switchTab('tab-meeting-converter', this)">Tab 8 Meeting Converter</button>
+    <button class="tab-button" data-tab="tab-multi-chat" onclick="switchTab('tab-multi-chat', this)">Tab 9 Multi-User Chat</button>
   </div>
   <section id="tab-simple-upload" class="tab-section active">
     <h2>Simple Upload</h2>
@@ -3164,6 +3521,64 @@ def render_index(payload: Dict[str, object]) -> str:
       <br>
       <h4>Parsing Summary</h4>
       <pre id="converter_summary" style="background: #f4f6f4; padding: 12px; border-radius: 6px; overflow-x: auto; font-family: monospace; white-space: pre-wrap;"></pre>
+    </div>
+  </section>
+  <section id="tab-multi-chat" class="tab-section">
+    <h2>Multi-User Chat Gateway</h2>
+    <p>透過隔離的對話 ID，讓不同同仁在同一個筆記本下進行獨立的問答，互不干涉且零 Token 費用。</p>
+    
+    <div class="grid-2">
+      <div class="upload-card">
+        <form id="multiChatForm" onsubmit="event.preventDefault(); sendChatMessage();">
+          <label><strong>Target Notebook ID</strong></label><br>
+          <input type="text" id="chat_notebook_id" style="width:100%; padding:8px; border:1px solid #cfd8d3; border-radius:6px;" value="{escape_html(active_notebook_id or '73085c64-dea5-4945-9226-949023b0ac9b')}">
+          <br><br>
+          
+          <label><strong>User Name (Submitter)</strong></label><br>
+          <input type="text" id="chat_user_name" style="width:100%; padding:8px; border:1px solid #cfd8d3; border-radius:6px;" placeholder="請輸入您的姓名/代號 (如: PM-A)" value="PM-A">
+          <br><br>
+          
+          <label><strong>Conversation Session</strong></label><br>
+          <select id="chat_session_select" style="width:100%; padding:8px; border:1px solid #cfd8d3; border-radius:6px;" onchange="onSessionSelectChange();">
+            <option value="new">-- 開啟全新對話 (Create New Chat) --</option>
+          </select>
+          <br><br>
+          
+          <label><strong>Enter Question</strong></label><br>
+          <textarea id="chat_question" style="width: 100%; height: 120px; padding: 12px; border: 1px solid #cfd8d3; border-radius: 6px; font-family: inherit;" placeholder="請輸入您想對 NotebookLM 提問的問題..."></textarea>
+          <br><br>
+          
+          <button class="button" type="submit" id="btn_send_chat">Send Question</button>
+        </form>
+      </div>
+
+      <div class="upload-card" style="display:flex; flex-direction:column; max-height:480px;">
+        <h3>Chat Box</h3>
+        <div id="chat_box_conversation" style="flex-grow:1; overflow-y:auto; border:1px solid #cfd8d3; border-radius:6px; background:#f9faf9; padding:12px; margin-bottom:12px; min-height:300px;">
+          <div style="color:#66706b; text-align:center; margin-top:100px;">請選擇對話或輸入問題開始問答</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="upload-card" style="margin-top:18px;">
+      <h3>Admin Session Audit (管理者審計面板)</h3>
+      <p class="muted">地端儲存的所有隔離對話清單。管理員可以直接點擊切換檢視歷史，或刪除對話。</p>
+      <div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; background:white;">
+          <thead>
+            <tr style="background:#e8f1ed; color:#174f43;">
+              <th style="padding:10px; border:1px solid #d8ddd8; text-align:left;">使用者姓名</th>
+              <th style="padding:10px; border:1px solid #d8ddd8; text-align:left;">對話 ID (Session ID)</th>
+              <th style="padding:10px; border:1px solid #d8ddd8; text-align:left;">最後發問內容</th>
+              <th style="padding:10px; border:1px solid #d8ddd8; text-align:left;">最後發問時間</th>
+              <th style="padding:10px; border:1px solid #d8ddd8; text-align:left;">操作</th>
+            </tr>
+          </thead>
+          <tbody id="admin_sessions_table_body">
+            <tr><td colspan="5" style="text-align:center; padding:20px; color:#66706b;">載入中...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </section>
 </main>
