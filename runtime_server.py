@@ -2441,6 +2441,123 @@ def make_handler(config: AppConfig):
                         pass
                 
                 self._send_json({"ok": True})
+            elif parsed.path == "/api/gemini/ask":
+                content_length = int(self.headers.get("Content-Length", 0))
+                post_data = self.rfile.read(content_length).decode("utf-8")
+                from urllib.parse import parse_qs
+                params = parse_qs(post_data)
+                user_name = params.get("user_name", [""])[0].strip()
+                question = params.get("question", [""])[0].strip()
+                metadata = params.get("metadata", [""])[0].strip()
+
+                if not user_name or not question:
+                    self._send_json({"ok": False, "error": "User Name and Question are required."})
+                    return
+
+                import sys
+                import subprocess
+                import json
+                
+                helper_path = Path(config.project_root) / "gemini_helper.py"
+                cmd = [sys.executable, str(helper_path), "-q", question]
+                if metadata and metadata != "new" and metadata != "[]" and metadata != "null":
+                    cmd.extend(["-m", metadata])
+                
+                try:
+                    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+                    if result.returncode != 0:
+                        self._send_json({"ok": False, "error": f"Helper execution failed: {result.stderr or result.stdout}"})
+                        return
+
+                    try:
+                        result_data = json.loads(result.stdout)
+                    except Exception as je:
+                        self._send_json({"ok": False, "error": f"Failed to parse helper output: {result.stdout}, err: {str(je)}"})
+                        return
+                    
+                    if not result_data.get("ok"):
+                        self._send_json({"ok": False, "error": result_data.get("error", "Unknown helper error")})
+                        return
+
+                    answer = result_data["answer"]
+                    resolved_metadata = result_data["metadata"]
+                    resolved_conv_id = resolved_metadata[0] if resolved_metadata else "unknown"
+
+                    sessions_file = Path(config.project_root) / "data" / "gemini_sessions.json"
+                    import datetime
+                    
+                    data = {"sessions": {}}
+                    if sessions_file.exists():
+                        try:
+                            with open(sessions_file, "r", encoding="utf-8") as f:
+                                data = json.load(f)
+                        except Exception:
+                            pass
+                    
+                    if "sessions" not in data:
+                        data["sessions"] = {}
+                        
+                    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    if resolved_conv_id not in data["sessions"]:
+                        data["sessions"][resolved_conv_id] = {
+                            "user_name": user_name,
+                            "created_at": now_str,
+                            "last_query_at": now_str,
+                            "metadata": resolved_metadata,
+                            "turns": []
+                        }
+                    else:
+                        data["sessions"][resolved_conv_id]["last_query_at"] = now_str
+                        data["sessions"][resolved_conv_id]["user_name"] = user_name
+                        data["sessions"][resolved_conv_id]["metadata"] = resolved_metadata
+                        
+                    data["sessions"][resolved_conv_id]["turns"].append({
+                        "role": "user",
+                        "content": question,
+                        "timestamp": now_str
+                    })
+                    data["sessions"][resolved_conv_id]["turns"].append({
+                        "role": "assistant",
+                        "content": answer,
+                        "timestamp": now_str
+                    })
+                    
+                    with open(sessions_file, "w", encoding="utf-8") as f:
+                        json.dump(data, f, ensure_ascii=False, indent=2)
+
+                    self._send_json({
+                        "ok": True,
+                        "answer": answer,
+                        "metadata": json.dumps(resolved_metadata)
+                    })
+                except Exception as e:
+                    self._send_json({"ok": False, "error": str(e)})
+
+            elif parsed.path == "/api/gemini/delete":
+                content_length = int(self.headers.get("Content-Length", 0))
+                post_data = self.rfile.read(content_length).decode("utf-8")
+                from urllib.parse import parse_qs
+                params = parse_qs(post_data)
+                conversation_id = params.get("conversation_id", [""])[0].strip()
+
+                if not conversation_id:
+                    self._send_json({"ok": False, "error": "Conversation ID is required."})
+                    return
+
+                sessions_file = Path(config.project_root) / "data" / "gemini_sessions.json"
+                if sessions_file.exists():
+                    try:
+                        with open(sessions_file, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                        if "sessions" in data and conversation_id in data["sessions"]:
+                            del data["sessions"][conversation_id]
+                            with open(sessions_file, "w", encoding="utf-8") as f:
+                                json.dump(data, f, ensure_ascii=False, indent=2)
+                    except Exception:
+                        pass
+                
+                self._send_json({"ok": True})
             else:
                 self.send_error(404, "Not found")
 
@@ -2679,6 +2796,51 @@ def make_handler(config: AppConfig):
                     self._send_json({"ok": False, "error": "Conversation ID is required."})
                     return
                 sessions_file = Path(config.project_root) / "data" / "multichat_sessions.json"
+                import json
+                turns = []
+                if sessions_file.exists():
+                    try:
+                        with open(sessions_file, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                        if "sessions" in data and conversation_id in data["sessions"]:
+                            turns = data["sessions"][conversation_id].get("turns", [])
+                    except Exception:
+                        pass
+                self._send_json({"ok": True, "turns": turns})
+            elif parsed.path == "/api/gemini/sessions":
+                sessions_file = Path(config.project_root) / "data" / "gemini_sessions.json"
+                import json
+                sessions_list = []
+                if sessions_file.exists():
+                    try:
+                        with open(sessions_file, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                        for cid, info in data.get("sessions", {}).items():
+                            last_q = ""
+                            if info.get("turns"):
+                                for turn in reversed(info["turns"]):
+                                    if turn.get("role") == "user":
+                                        last_q = turn.get("content", "")
+                                        break
+                            sessions_list.append({
+                                "conversation_id": cid,
+                                "user_name": info.get("user_name", "Unknown"),
+                                "created_at": info.get("created_at", ""),
+                                "last_query_at": info.get("last_query_at", ""),
+                                "last_question": last_q,
+                                "metadata": json.dumps(info.get("metadata", []))
+                            })
+                    except Exception:
+                        pass
+                sessions_list.sort(key=lambda x: x["last_query_at"], reverse=True)
+                self._send_json({"ok": True, "sessions": sessions_list})
+            elif parsed.path == "/api/gemini/history":
+                params = parse_qs(parsed.query)
+                conversation_id = params.get("conversation_id", [""])[0].strip()
+                if not conversation_id:
+                    self._send_json({"ok": False, "error": "Conversation ID is required."})
+                    return
+                sessions_file = Path(config.project_root) / "data" / "gemini_sessions.json"
                 import json
                 turns = []
                 if sessions_file.exists():
