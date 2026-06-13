@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+config/config.json
+data/inbox/*
+data/temp/*
+data/completed/*
+data/failed/*
+data/meeting_export/*
+data/gas_downloads/*
+user_settings.json
+.DS_Store
+screen_log.txt
+research/
+logs/
+config/
