@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TLS 指紋偽裝與防爬蟲突破技術指南 | AI NotebookLM v3.01</title>
+    <!-- Google Fonts: Space Grotesk & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-primary: #0a0518;
+            --bg-secondary: #120b2d;
+            --bg-card: rgba(26, 18, 58, 0.45);
+            --bg-card-hover: rgba(36, 26, 78, 0.65);
+            
+            --color-primary: #a855f7;
+            --color-secondary: #06b6d4;
+            --color-accent: #f43f5e;
+            --color-success: #10b981;
+            
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --text-glow: rgba(168, 85, 247, 0.4);
+            
+            --border-glow: rgba(6, 182, 212, 0.3);
+            --transition-speed: 0.3s;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            line-height: 1.6;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(168, 85, 247, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(6, 182, 212, 0.15) 0%, transparent 40%);
+            background-attachment: fixed;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            border: 2px solid var(--bg-primary);
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--color-primary);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+
+        /* Top Header Navigation style */
+        header {
+            text-align: center;
+            margin-bottom: 4rem;
+            position: relative;
+        }
+
+        .badge {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(6, 182, 212, 0.2));
+            border: 1px solid var(--color-secondary);
+            color: var(--color-secondary);
+            padding: 0.4rem 1.2rem;
+            border-radius: 50px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            display: inline-block;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.25);
+            animation: pulse 3s infinite alternate;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 10px rgba(6, 182, 212, 0.2); }
+            100% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.5); }
+        }
+
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(2.2rem, 5vw, 3.8rem);
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(to right, #ffffff, #a855f7, #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 40px rgba(168, 85, 247, 0.2);
+        }
+
+        .subtitle {
+            font-size: clamp(1rem, 2vw, 1.25rem);
+            color: var(--text-muted);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* Section Layouts */
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2.5rem;
+            margin-bottom: 4rem;
+        }
+
+        @media (min-width: 900px) {
+            .grid-2 {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 2.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: all var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(12px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, transparent, rgba(6, 182, 212, 0.03), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.6s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: var(--border-glow);
+            background: var(--bg-card-hover);
+            box-shadow: 0 15px 40px rgba(6, 182, 212, 0.15);
+        }
+
+        .card:hover::before {
+            transform: translateX(100%);
+        }
+
+        .card-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: #fff;
+        }
+
+        .card-title svg {
+            color: var(--color-secondary);
+        }
+
+        .text-glow-purple {
+            text-shadow: 0 0 10px var(--text-glow);
+        }
+
+        /* Comparison Tool UI */
+        .simulator-box {
+            background: #080314;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            margin-top: 1.5rem;
+            overflow: hidden;
+        }
+
+        .sim-header {
+            background: rgba(255, 255, 255, 0.03);
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .dots {
+            display: flex;
+            gap: 6px;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        .dot-red { background: #ff5f56; }
+        .dot-yellow { background: #ffbd2e; }
+        .dot-green { background: #27c93f; }
+
+        .sim-tabs {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .sim-tab-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-muted);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .sim-tab-btn.active {
+            background: rgba(168, 85, 247, 0.15);
+            border-color: rgba(168, 85, 247, 0.3);
+            color: #fff;
+        }
+
+        .sim-body {
+            padding: 1.5rem;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            color: #d1d5db;
+            min-height: 250px;
+            position: relative;
+        }
+
+        .fingerprint-data {
+            display: none;
+            animation: fadeIn 0.4s ease forwards;
+        }
+
+        .fingerprint-data.active {
+            display: block;
+        }
+
+        .highlight-red { color: #f43f5e; }
+        .highlight-green { color: #10b981; }
+        .highlight-yellow { color: #f59e0b; }
+        .highlight-cyan { color: #06b6d4; }
+        .highlight-purple { color: #c084fc; }
+
+        /* Flow Diagrams */
+        .diagram {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5rem;
+            padding: 1rem 0;
+        }
+
+        .diag-node {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            text-align: center;
+            width: 100%;
+            max-width: 320px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .diag-node.danger {
+            border-color: rgba(244, 63, 94, 0.4);
+            background: rgba(244, 63, 94, 0.05);
+        }
+
+        .diag-node.success {
+            border-color: rgba(16, 185, 129, 0.4);
+            background: rgba(16, 185, 129, 0.05);
+        }
+
+        .diag-arrow {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        .diag-arrow svg {
+            width: 20px;
+            height: 20px;
+            stroke-width: 2px;
+        }
+
+        /* Tech Details Accordion */
+        .tech-detail {
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            background: rgba(255, 255, 255, 0.01);
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+
+        .tech-summary {
+            padding: 1.25rem;
+            cursor: pointer;
+            font-weight: 500;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+            background: rgba(255, 255, 255, 0.02);
+            transition: background 0.2s ease;
+        }
+
+        .tech-summary:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .tech-content {
+            padding: 0 1.25rem 1.25rem 1.25rem;
+            display: none;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
+        .tech-detail.open .tech-content {
+            display: block;
+        }
+
+        .tech-detail.open .arrow-icon {
+            transform: rotate(180deg);
+        }
+
+        .arrow-icon {
+            transition: transform 0.2s ease;
+        }
+
+        /* Callout Box / Alert Style */
+        .callout {
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.1), rgba(168, 85, 247, 0.1));
+            border-left: 4px solid var(--color-secondary);
+            padding: 1.5rem;
+            border-radius: 0 16px 16px 0;
+            margin: 2rem 0;
+        }
+
+        .callout h4 {
+            color: #fff;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Code Block Styling */
+        pre {
+            background: #070312;
+            padding: 1.25rem;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+
+        code {
+            font-family: 'Courier New', Courier, monospace;
+            color: var(--color-secondary);
+        }
+
+        /* Custom Interactive buttons */
+        .btn {
+            background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+            border: none;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(168, 85, 247, 0.6);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: var(--text-main);
+            box-shadow: none;
+        }
+
+        .btn-outline:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: #fff;
+            box-shadow: none;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; max-height: 0; }
+            to { opacity: 1; max-height: 1000px; }
+        }
+
+        footer {
+            text-align: center;
+            padding: 4rem 0 2rem 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        footer a {
+            color: var(--color-secondary);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Result Panel */
+        .result-panel {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 600;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .result-panel.pass {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--color-success);
+        }
+
+        .result-panel.fail {
+            background: rgba(244, 63, 94, 0.15);
+            border: 1px solid rgba(244, 63, 94, 0.3);
+            color: var(--color-accent);
+        }
+
+        .icon-pulse {
+            animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+
+        @keyframes ping {
+            75%, 100% {
+                transform: scale(1.3);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        
+        <!-- Header -->
+        <header>
+            <span class="badge">Windows & Local Deploy Special Feature</span>
+            <h1>TLS 指紋偽裝與防爬蟲突破技術</h1>
+            <p class="subtitle">深度剖析 curl_cffi 在 AI NotebookLM 專案中，如何成功模擬 Chrome 瀏覽器之 TLS 加密指紋與 HTTP/2 握手，實現無障礙繞過 Cloudflare 驗證的底層技術原理。</p>
+        </header>
+
+        <!-- Main Grid -->
+        <div class="grid grid-2">
+            
+            <!-- Left Card: The Problem -->
+            <div class="card">
+                <div class="card-title text-glow-purple">
+                    <!-- Target Icon SVG -->
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line><line x1="12" y1="6" x2="12" y2="2"></line><line x1="12" y1="22" x2="12" y2="18"></line></svg>
+                    為何普通爬蟲(Requests/HTTPX)總被 403 攔截？
+                </div>
+                <p style="margin-bottom: 1rem; color: var(--text-muted);">
+                    現代防爬蟲服務（如 Cloudflare WAF、Akamai、Fastly）早已不單純依賴 <code>User-Agent</code> 或 IP 限制來識別機器人。當您的請求到達網關時，它們會在建立安全通道的最早階段進行<strong>特徵掃描</strong>。
+                </p>
+                
+                <!-- Diagram 1 -->
+                <div class="diagram">
+                    <div class="diag-node danger">
+                        <strong>Python Requests 發送請求</strong>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">預設使用 OpenSSL 密鑰套件</div>
+                    </div>
+                    <div class="diag-arrow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+                        <span>進行 TLS 握手 (ClientHello)</span>
+                    </div>
+                    <div class="diag-node danger" style="border-style: dashed;">
+                        <strong>Cloudflare 防火牆檢測</strong>
+                        <div style="font-size: 0.75rem; color: var(--color-accent); margin-top: 4px;">JA3 指紋為 "Script/Python" ❌</div>
+                    </div>
+                    <div class="diag-arrow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+                    </div>
+                    <div class="diag-node danger" style="background: rgba(244,63,94,0.15);">
+                        <strong>直接阻斷返回 403 Forbidden ❌</strong>
+                    </div>
+                </div>
+
+                <div class="tech-detail-group" style="margin-top: 1.5rem;">
+                    <div class="tech-detail">
+                        <div class="tech-summary" onclick="toggleTech(this)">
+                            <span>1. TLS 加密指紋 (JA3 / JA4)</span>
+                            <svg class="arrow-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </div>
+                        <div class="tech-content">
+                            JA3 是一種透過提取 TLS ClientHello 封包中特定欄位（TLS 版本、可接受的密碼套件、擴充功能、橢圓曲線及點格式）並串接 MD5 哈希產生的指紋。OpenSSL 產生的指紋與真正的 Chrome/Safari 截然不同，這使得防火牆在解密任何 HTTP 資料前，就能判定此請求為自動化腳本。
+                        </div>
+                    </div>
+                    
+                    <div class="tech-detail">
+                        <div class="tech-summary" onclick="toggleTech(this)">
+                            <span>2. HTTP/2 幀特徵 (SETTINGS Frame)</span>
+                            <svg class="arrow-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </div>
+                        <div class="tech-content">
+                            在 TLS 完成後，HTTP/2 連線初始化時會發送 <code>SETTINGS</code> 幀。真實瀏覽器的流量具有特定的視窗大小（Window Size）、串流優先權（Stream Priority）及偽標頭（Pseudo-headers, 如 <code>:method</code>, <code>:path</code>, <code>:scheme</code>, <code>:authority</code>）順序。一般 HTTPX 函式庫發送的順序與其申明的 User-Agent 瀏覽器嚴重不符，立馬被識破。
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Card: Interactive Simulator -->
+            <div class="card">
+                <div class="card-title text-glow-purple">
+                    <!-- Eye Icon SVG -->
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    互動體驗區：指紋模擬比對器
+                </div>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                    點擊下方選項，觀察發送請求時 ClientHello 的指紋結構，以及 Cloudflare WAF 的判定流程與結果。
+                </p>
+
+                <div class="simulator-box">
+                    <div class="sim-header">
+                        <div class="dots">
+                            <span class="dot dot-red"></span>
+                            <span class="dot dot-yellow"></span>
+                            <span class="dot dot-green"></span>
+                        </div>
+                        <div class="sim-tabs">
+                            <button class="sim-tab-btn active" onclick="switchSim('python')">Standard Python</button>
+                            <button class="sim-tab-btn" onclick="switchSim('curl_cffi')">curl_cffi (Chrome)</button>
+                        </div>
+                    </div>
+                    <div class="sim-body">
+                        <!-- Python data -->
+                        <div id="sim-python" class="fingerprint-data active">
+                            <span class="highlight-purple">// TLS ClientHello (OpenSSL 3.0.x)</span><br>
+                            <span class="highlight-cyan">TLS Version:</span> TLS 1.3 (0x0304)<br>
+                            <span class="highlight-cyan">Cipher Suites:</span> [TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305...]<br>
+                            <span class="highlight-cyan">TLS Extensions:</span> server_name(0), status_request(5), supported_groups(10), ec_point_formats(11)<br><br>
+                            <span class="highlight-yellow">JA3 Raw String:</span> 771,4866-4867-4865-49195...,0-23-65281-10-11...,29-23-24,0<br>
+                            <span class="highlight-yellow">JA3 Hash:</span> <span class="highlight-red">9b292db984623101cd76307a514d8d1e</span> (Known Script/Bot)<br><br>
+                            <span class="highlight-cyan">HTTP/2 SETTINGS:</span> SETTINGS_MAX_CONCURRENT_STREAMS=100, SETTINGS_INITIAL_WINDOW_SIZE=65535<br>
+                            <span class="highlight-cyan">User-Agent:</span> Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0
+                        </div>
+                        
+                        <!-- curl_cffi data -->
+                        <div id="sim-curl_cffi" class="fingerprint-data">
+                            <span class="highlight-purple">// TLS ClientHello (BoringSSL - Chrome 120 Impersonate)</span><br>
+                            <span class="highlight-cyan">TLS Version:</span> TLS 1.3 (0x0304)<br>
+                            <span class="highlight-cyan">Cipher Suites:</span> [TLS_AES_128_GCM_SHA256, TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256...]<br>
+                            <span class="highlight-cyan">TLS Extensions:</span> grease(2570), server_name(0), supported_groups(10), key_share(51), alpn(16)...<br><br>
+                            <span class="highlight-yellow">JA3 Raw String:</span> 771,4865-4866-4867-49195-49199...,0-23-65281-10-11-35-16-5-13...,29-23-24,0<br>
+                            <span class="highlight-yellow">JA3 Hash:</span> <span class="highlight-green">66918128f1b9b03358d776a1123d8c1a</span> (Chrome 120 Official)<br><br>
+                            <span class="highlight-cyan">HTTP/2 SETTINGS:</span> SETTINGS_HEADER_TABLE_SIZE=65536, SETTINGS_MAX_CONCURRENT_STREAMS=1000, SETTINGS_INITIAL_WINDOW_SIZE=6291456<br>
+                            <span class="highlight-cyan">User-Agent:</span> Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="result-box" class="result-panel fail">
+                    <span style="font-size: 1.25rem;">⚠️</span>
+                    <div>
+                        <strong>Cloudflare WAF 判定結果: 阻斷 (403 Forbidden)</strong>
+                        <div style="font-weight: normal; font-size: 0.8rem; opacity: 0.9;">原因: JA3 指紋與所宣稱之 Chrome 瀏覽器 User-Agent 不一致。偵測到自動化模擬行為。</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Section 2: curl_cffi Features -->
+        <section class="card" style="margin-bottom: 4rem;">
+            <div class="card-title text-glow-purple">
+                <!-- Lock Icon SVG -->
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                核心修復技術：curl_cffi 的黑魔法
+            </div>
+            
+            <p style="margin-bottom: 1.5rem; color: var(--text-muted);">
+                <code>curl_cffi</code> 不僅僅是另一個 HTTP 客戶端，它是基於強大的 C 語言底層 <code>curl-impersonate</code> 所開發的 Python 綁定。它的工作原理是在編譯階段動態替換並重新訂製底層的安全傳輸模組：
+            </p>
+
+            <div class="grid grid-2" style="gap: 1.5rem; margin-bottom: 2rem;">
+                <div style="background: rgba(255,255,255,0.02); padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                    <h5 style="color: var(--color-secondary); font-size: 1.1rem; margin-bottom: 0.5rem; font-family: 'Space Grotesk', sans-serif;">🔒 1. 動態更換 SSL 庫</h5>
+                    <p style="font-size: 0.9rem; color: var(--text-muted);">
+                        一般 Python 使用系統安裝的 <strong>OpenSSL</strong> 庫，而 Chrome 則使用 Google 自家的 <strong>BoringSSL</strong>，Firefox 使用 <strong>NSS</strong>。<code>curl_cffi</code> 會直接連結至這些瀏覽器所用的專有密碼學函式庫，因此其 TLS 握手行為在硬體與協議層上與瀏覽器完全一致。
+                    </p>
+                </div>
+
+                <div style="background: rgba(255,255,255,0.02); padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                    <h5 style="color: var(--color-secondary); font-size: 1.1rem; margin-bottom: 0.5rem; font-family: 'Space Grotesk', sans-serif;">🧩 2. GREASE 隨機擴充模擬</h5>
+                    <p style="font-size: 0.9rem; color: var(--text-muted);">
+                        Chrome 為了防止網絡中間件硬編碼 TLS 版本，引入了 GREASE 機制（隨機向擴充列表或加密套件中注入無效的值）。<code>curl_cffi</code> 完整實現了這套機制，使每次 TLS 握手的擴充字串中都帶有正確的隨機 GREASE 值。
+                    </p>
+                </div>
+            </div>
+
+            <div class="callout">
+                <h4>
+                    <!-- Info Icon SVG -->
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    本專案的無感熱更新優勢
+                </h4>
+                <p style="font-size: 0.95rem; color: var(--text-main);">
+                    在 Windows 部署環境中，由於我們採用了<strong>獨立子行程 (Subprocess decoupled architecture)</strong> 的設計，將 Google NotebookLM 的爬蟲會話（<code>gemini_helper.py</code>）作為一個獨立的 Python 行程運行。這意味著：
+                    當您在 <code>.venv</code> 中手動補齊安裝了 <code>curl_cffi</code>、<code>cffi</code> 與 <code>pycparser</code> 後，後端 runtime_server 完全不需要進行重啟，下一次使用者提問時，新啟動的子行程便會自動調用最新的套件進行 TLS 繞過，達成「零停機熱更新」的無感部署體驗！
+                </p>
+            </div>
+
+            <h4 style="margin-top: 2rem; margin-bottom: 1rem; color: #fff;">Python 代碼調用範例</h4>
+            <pre><code><span class="highlight-purple">from</span> curl_cffi <span class="highlight-purple">import</span> requests
+
+<span class="highlight-yellow"># 指定 impersonate 參數，直接模擬 Chrome 120 版本</span>
+response = requests.get(
+    <span class="highlight-green">"https://notebooklm.google.com/api/v1/..."</span>, 
+    impersonate=<span class="highlight-green">"chrome120"</span>,
+    headers={
+        <span class="highlight-green">"User-Agent"</span>: <span class="highlight-green">"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36..."</span>
+    }
+)
+print(response.status_code) <span class="highlight-yellow"># 返回 200 OK，成功突破 WAF 🚀</span></code></pre>
+        </section>
+
+        <!-- Section 3: Advanced Defense & Solutions -->
+        <section class="grid grid-2">
+            
+            <div class="card">
+                <div class="card-title text-glow-purple">
+                    <!-- Shield Icon SVG -->
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                    繞過 Cloudflare 的三層防禦體系
+                </div>
+                <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+                    防爬蟲巨頭（Cloudflare）目前採用的是多維度交叉驗證，突破的難度分為三個層級：
+                </p>
+                
+                <ul style="list-style-position: inside; color: var(--text-muted); display: grid; gap: 1rem;">
+                    <li>
+                        <strong style="color: #fff;">第一層：網路與協議指紋 (TLS JA3/JA4 & HTTP/2)</strong><br>
+                        這是最基本的檢測。<code>curl_cffi</code> 完美的解決了這一層，成功率達 90% 以上。
+                    </li>
+                    <li>
+                        <strong style="color: #fff;">第二層：IP 信用評等 (IP Reputation)</strong><br>
+                        若您的主機 IP 來自廉價的 IDC（資料中心，如 AWS, GCP），Cloudflare 會直接給出高威脅係數，進而強制跳出驗證碼（Turnstile）。建議配合高品質的<strong>住宅代理 (Residential Proxies)</strong> 共同使用。
+                    </li>
+                    <li>
+                        <strong style="color: #fff;">第三層：瀏覽器行為與 JS 渲染 (Behavioral & JS Challenges)</strong><br>
+                        部分頁面包含高強度的 JS 混淆驗證碼，這時僅憑網路庫（不渲染 JS）是無法通過的。需要透過 <code>Playwright</code> 搭配 <code>Stealth plugin</code> 或 <code>SeleniumBase UC Mode</code> 先行獲取 <code>cf_clearance</code> Cookie，再交給 <code>curl_cffi</code> 發送請求。
+                    </li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <div class="card-title text-glow-purple">
+                    <!-- Zap Icon SVG -->
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                    Windows 部署除錯快速指南
+                </div>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                    在 Windows Server 或 Local 電腦部署時，<code>curl_cffi</code> 可能會因為缺失 C++ 執行庫或架構不相容導致編譯錯誤。請依照以下步驟排查：
+                </p>
+
+                <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 10px; font-size: 0.85rem; color: var(--text-muted);">
+                    <p style="margin-bottom: 0.5rem;"><strong style="color: var(--color-secondary);">Q1: 導入時報錯 <code>ImportError: DLL load failed</code></strong></p>
+                    <p style="margin-bottom: 1rem;">A: 這是因為 Windows 缺少 Visual C++ Redistributable。請安裝微軟官方的 <a href="https://aka.ms/vs/17/release/vc_redist.x64.exe" style="color: var(--color-secondary);" target="_blank">VC_redist.x64.exe</a> 執行庫。</p>
+
+                    <p style="margin-bottom: 0.5rem;"><strong style="color: var(--color-secondary);">Q2: <code>pip install curl_cffi</code> 失敗</strong></p>
+                    <p>A: 請升級您的 pip 工具：<code>python -m pip install --upgrade pip</code>。這能確保拉取到包含預編譯 <code>.whl</code> 二進位檔的 Windows 版本，避免因系統無 C 編譯器而進入原始碼 compile 流程失敗。</p>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Footer -->
+        <footer>
+            <p>© 2026 AI NotebookLM v3.01. 本技術文檔作為專案 Repo 之技術儲備說明獨立運作。</p>
+        </footer>
+
+    </div>
+
+    <!-- Script for interactive elements -->
+    <script>
+        function toggleTech(element) {
+            const parent = element.parentElement;
+            parent.classList.toggle('open');
+        }
+
+        function switchSim(mode) {
+            // Update tabs
+            const tabs = document.querySelectorAll('.sim-tab-btn');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            
+            // Update active data
+            const datas = document.querySelectorAll('.fingerprint-data');
+            datas.forEach(data => data.classList.remove('active'));
+            
+            const resultBox = document.getElementById('result-box');
+            
+            if (mode === 'python') {
+                tabs[0].classList.add('active');
+                document.getElementById('sim-python').classList.add('active');
+                
+                resultBox.className = 'result-panel fail';
+                resultBox.innerHTML = `
+                    <span style="font-size: 1.25rem;">⚠️</span>
+                    <div>
+                        <strong>Cloudflare WAF 判定結果: 阻斷 (403 Forbidden)</strong>
+                        <div style="font-weight: normal; font-size: 0.8rem; opacity: 0.9;">原因: JA3 指紋為典型的 Python OpenSSL 特徵，與 Chrome User-Agent 不相符。</div>
+                    </div>
+                `;
+            } else {
+                tabs[1].classList.add('active');
+                document.getElementById('sim-curl_cffi').classList.add('active');
+                
+                resultBox.className = 'result-panel pass';
+                resultBox.innerHTML = `
+                    <span style="font-size: 1.25rem; display: inline-flex;" class="icon-pulse">🚀</span>
+                    <div>
+                        <strong>Cloudflare WAF 判定結果: 放行 (200 OK / Pass)</strong>
+                        <div style="font-weight: normal; font-size: 0.8rem; opacity: 0.9;">原因: 偵測到合法的 Chrome 120 TLS / HTTP2 指紋及 GREASE 擴充，被判定為真實瀏覽器請求。</div>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
