@@ -1,3 +1,4 @@
+# v2.01版 Falo x Force Cheng 2026/6/14
 """Local HTML portal runtime for AI NotebookLM Runtime Lab."""
 
 from __future__ import annotations
@@ -30,8 +31,8 @@ import openpyxl
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-APP_VERSION = "v1.02"
-APP_WATERMARK = "Falo x Force"
+APP_VERSION = "v2.19"
+APP_WATERMARK = "v2.19版 Falo x Force Cheng 2026/6/14"
 TAIPEI_TZ = ZoneInfo("Asia/Taipei")
 DEFAULT_SIMPLE_TYPES = [".pdf", ".txt", ".md", ".csv", ".docx", ".xlsx", ".pptx", ".png", ".jpg", ".jpeg"]
 _GAS_AUTO_WORKER_STARTED = False
@@ -51,6 +52,364 @@ ROLE_PERMISSIONS = {
     "document_manager": {"upload_folder", "adapter_execute", "create_notebook", "sync_projects"},
     "admin": {"upload_folder", "adapter_execute", "create_notebook", "sync_projects", "clear_runtime"},
 }
+
+SESSION_DB = {}
+
+
+import queue
+import uuid
+
+class TaskQueueManager:
+    def __init__(self, config: AppConfig):
+        self.config = config
+        self.tasks = {}
+        self.q = queue.Queue()
+        self.lock = threading.Lock()
+        self.worker_threads = []
+        self.running = False
+        self.avg_nlm_duration = 20.0
+        self.avg_gemini_duration = 10.0
+        self.active_tasks = {}  # task_id -> start_time
+
+    def add_task(self, platform: str, user_name: str, payload: dict) -> str:
+        task_id = f"task_{uuid.uuid4().hex[:8]}"
+        task = {
+            "task_id": task_id,
+            "platform": platform,
+            "user_name": user_name,
+            "status": "pending",
+            "payload": payload,
+            "result": None,
+            "error": None,
+            "created_at": time.time(),
+            "started_at": None,
+            "completed_at": None
+        }
+        with self.lock:
+            self.tasks[task_id] = task
+        self.q.put(task_id)
+        return task_id
+
+    def get_task(self, task_id: str) -> dict | None:
+        with self.lock:
+            return self.tasks.get(task_id)
+
+    def clear_queue(self):
+        with self.lock:
+            for task_id, task in self.tasks.items():
+                if task["status"] == "pending":
+                    task["status"] = "failed"
+                    task["error"] = "Cancelled by administrator"
+            while not self.q.empty():
+                try:
+                    self.q.get_nowait()
+                    self.q.task_done()
+                except queue.Empty:
+                    break
+
+    def get_active_tasks(self) -> list:
+        with self.lock:
+            active = []
+            for t_id, t in self.tasks.items():
+                if t["status"] in {"pending", "processing"}:
+                    active.append(t)
+            active.sort(key=lambda x: x["created_at"])
+            
+            processing_tasks = [t for t in active if t["status"] == "processing"]
+            pending_tasks = [t for t in active if t["status"] == "pending"]
+            
+            num_workers = 3
+            workers = [0.0] * num_workers
+            
+            # Assign processing tasks to workers
+            for idx, t in enumerate(processing_tasks):
+                start_time = self.active_tasks.get(t["task_id"], t["started_at"] or t["created_at"])
+                elapsed = time.time() - start_time
+                base = self.avg_nlm_duration if t["platform"] == "notebooklm" else self.avg_gemini_duration
+                rem = max(1.0, base - elapsed)
+                
+                worker_idx = idx % num_workers
+                workers[worker_idx] = rem
+                t["eta"] = rem
+                
+            # Assign pending tasks
+            for t in pending_tasks:
+                next_free_worker = min(range(num_workers), key=lambda i: workers[i])
+                start_wait = workers[next_free_worker]
+                base = self.avg_nlm_duration if t["platform"] == "notebooklm" else self.avg_gemini_duration
+                completion_time = start_wait + base
+                
+                workers[next_free_worker] = completion_time
+                t["eta"] = completion_time
+                
+            result = []
+            for t in active:
+                result.append({
+                    "user_name": t["user_name"],
+                    "platform": t["platform"],
+                    "status": t["status"],
+                    "task_id": t["task_id"],
+                    "eta_seconds": round(t.get("eta", 0.0), 1)
+                })
+            return result
+
+    def get_task_status_detail(self, task_id: str) -> dict | None:
+        task = self.get_task(task_id)
+        if not task:
+            return None
+        
+        position = 0
+        if task["status"] == "pending":
+            with self.lock:
+                pending_tasks = [t for t in self.tasks.values() if t["status"] == "pending"]
+                pending_tasks.sort(key=lambda x: x["created_at"])
+                try:
+                    position = pending_tasks.index(task) + 1
+                except ValueError:
+                    position = 1
+        
+        active_list = self.get_active_tasks()
+        task_info = next((t for t in active_list if t["task_id"] == task_id), None)
+        eta = task_info["eta_seconds"] if task_info else 0.0
+
+        return {
+            "task_id": task["task_id"],
+            "platform": task["platform"],
+            "user_name": task["user_name"],
+            "status": task["status"],
+            "queue_position": position,
+            "eta_seconds": eta,
+            "result": task["result"],
+            "error": task["error"]
+        }
+
+    def start(self, max_workers=3):
+        with self.lock:
+            if self.running:
+                return
+            self.running = True
+            self.worker_threads = []
+            for _ in range(max_workers):
+                t = threading.Thread(target=self._worker_loop, daemon=True)
+                t.start()
+                self.worker_threads.append(t)
+
+    def _worker_loop(self):
+        while self.running:
+            try:
+                task_id = self.q.get(timeout=1.0)
+            except queue.Empty:
+                continue
+
+            task = self.get_task(task_id)
+            if not task:
+                self.q.task_done()
+                continue
+
+            with self.lock:
+                task["status"] = "processing"
+                task["started_at"] = time.time()
+                self.active_tasks[task_id] = time.time()
+
+            try:
+                platform = task["platform"]
+                payload = task["payload"]
+                
+                if platform == "notebooklm":
+                    result = self._run_notebooklm(payload)
+                else:
+                    result = self._run_gemini(payload)
+
+                elapsed = time.time() - task["started_at"]
+                
+                with self.lock:
+                    if result.get("ok"):
+                        task["status"] = "completed"
+                        task["result"] = result
+                        if platform == "notebooklm":
+                            self.avg_nlm_duration = self.avg_nlm_duration * 0.7 + elapsed * 0.3
+                        else:
+                            self.avg_gemini_duration = self.avg_gemini_duration * 0.7 + elapsed * 0.3
+                    else:
+                        task["status"] = "failed"
+                        task["error"] = result.get("error", "Unknown error")
+                    task["completed_at"] = time.time()
+
+            except Exception as e:
+                with self.lock:
+                    task["status"] = "failed"
+                    task["error"] = str(e)
+                    task["completed_at"] = time.time()
+            finally:
+                with self.lock:
+                    if task_id in self.active_tasks:
+                        del self.active_tasks[task_id]
+                self.q.task_done()
+
+    def _run_notebooklm(self, payload: dict) -> dict:
+        notebook_id = payload["notebook_id"]
+        user_name = payload["user_name"]
+        user_id = payload.get("user_id", "")
+        conversation_id = payload["conversation_id"]
+        question = payload["question"]
+
+        helper_path = PROJECT_ROOT / "ask_helper.py"
+        cmd = [sys.executable, str(helper_path), "-n", notebook_id, "-q", question]
+        if conversation_id and conversation_id != "new":
+            cmd.extend(["-c", conversation_id])
+
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            return {"ok": False, "error": f"Helper execution failed: {result.stderr or result.stdout}"}
+
+        try:
+            result_data = json.loads(result.stdout)
+        except Exception as je:
+            return {"ok": False, "error": f"Failed to parse helper output: {result.stdout}, err: {str(je)}"}
+
+        if not result_data.get("ok"):
+            return {"ok": False, "error": result_data.get("error", "Unknown helper error")}
+
+        answer = result_data["answer"]
+        resolved_conv_id = result_data["conversation_id"]
+
+        with self.lock:
+            sessions_file = PROJECT_ROOT / "data" / "multichat_sessions.json"
+            
+            data = {"sessions": {}}
+            if sessions_file.exists():
+                try:
+                    with open(sessions_file, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                except Exception:
+                    pass
+            
+            if "sessions" not in data:
+                data["sessions"] = {}
+                
+            now_str = datetime.now(TAIPEI_TZ).strftime("%Y-%m-%d %H:%M:%S")
+            
+            if resolved_conv_id not in data["sessions"]:
+                data["sessions"][resolved_conv_id] = {
+                    "user_id": user_id,
+                    "user_name": user_name,
+                    "notebook_id": notebook_id,
+                    "created_at": now_str,
+                    "last_query_at": now_str,
+                    "turns": []
+                }
+            else:
+                data["sessions"][resolved_conv_id]["last_query_at"] = now_str
+                data["sessions"][resolved_conv_id]["user_name"] = user_name
+                data["sessions"][resolved_conv_id]["user_id"] = user_id
+                
+            data["sessions"][resolved_conv_id]["turns"].append({
+                "role": "user",
+                "content": question,
+                "timestamp": now_str
+            })
+            data["sessions"][resolved_conv_id]["turns"].append({
+                "role": "assistant",
+                "content": answer,
+                "timestamp": now_str
+            })
+            
+            sessions_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(sessions_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+
+        return {
+            "ok": True,
+            "answer": answer,
+            "conversation_id": resolved_conv_id
+        }
+
+    def _run_gemini(self, payload: dict) -> dict:
+        user_name = payload["user_name"]
+        user_id = payload.get("user_id", "")
+        question = payload["question"]
+        metadata = payload["metadata"]
+        model = payload.get("model", "").strip()
+        thinking = payload.get("thinking", "").strip()
+
+        helper_path = PROJECT_ROOT / "gemini_helper.py"
+        cmd = [sys.executable, str(helper_path), "-q", question]
+        if metadata and metadata != "new" and metadata != "[]" and metadata != "null":
+            cmd.extend(["-m", metadata])
+        if model:
+            cmd.extend(["--model", model])
+        if thinking:
+            cmd.extend(["--thinking", thinking])
+
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            return {"ok": False, "error": f"Helper execution failed: {result.stderr or result.stdout}"}
+
+        try:
+            result_data = json.loads(result.stdout)
+        except Exception as je:
+            return {"ok": False, "error": f"Failed to parse helper output: {result.stdout}, err: {str(je)}"}
+        
+        if not result_data.get("ok"):
+            return {"ok": False, "error": result_data.get("error", "Unknown helper error")}
+
+        answer = result_data["answer"]
+        resolved_metadata = result_data["metadata"]
+        resolved_conv_id = resolved_metadata[0] if resolved_metadata else "unknown"
+
+        with self.lock:
+            sessions_file = PROJECT_ROOT / "data" / "gemini_sessions.json"
+            
+            data = {"sessions": {}}
+            if sessions_file.exists():
+                try:
+                    with open(sessions_file, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                except Exception:
+                    pass
+            
+            if "sessions" not in data:
+                data["sessions"] = {}
+                
+            now_str = datetime.now(TAIPEI_TZ).strftime("%Y-%m-%d %H:%M:%S")
+            
+            if resolved_conv_id not in data["sessions"]:
+                data["sessions"][resolved_conv_id] = {
+                    "user_id": user_id,
+                    "user_name": user_name,
+                    "created_at": now_str,
+                    "last_query_at": now_str,
+                    "metadata": resolved_metadata,
+                    "turns": []
+                }
+            else:
+                data["sessions"][resolved_conv_id]["last_query_at"] = now_str
+                data["sessions"][resolved_conv_id]["user_name"] = user_name
+                data["sessions"][resolved_conv_id]["metadata"] = resolved_metadata
+                data["sessions"][resolved_conv_id]["user_id"] = user_id
+                
+            data["sessions"][resolved_conv_id]["turns"].append({
+                "role": "user",
+                "content": question,
+                "timestamp": now_str
+            })
+            data["sessions"][resolved_conv_id]["turns"].append({
+                "role": "assistant",
+                "content": answer,
+                "timestamp": now_str
+            })
+            
+            sessions_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(sessions_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+
+        return {
+            "ok": True,
+            "answer": answer,
+            "metadata": json.dumps(resolved_metadata)
+        }
+
+task_queue_manager: TaskQueueManager | None = None
 
 
 def now_taipei() -> datetime:
@@ -165,13 +524,47 @@ def write_command_audit(config: AppConfig, event: str, payload: Dict[str, object
 
 def load_or_create_users(config: AppConfig) -> Dict[str, object]:
     path = users_path(config)
+    modified = False
+    data = {}
     if path.exists():
-        return json.loads(path.read_text(encoding="utf-8"))
-    payload = {
-        "app": "AI NotebookLM Runtime Lab",
-        "kind": "local_user_registry",
-        "updated_at": now_iso(),
-        "roles": {
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+
+    if not data or "local_users" not in data:
+        data = {
+            "app": "AI NotebookLM Runtime Lab",
+            "kind": "local_user_registry",
+            "updated_at": now_iso(),
+            "roles": {
+                "user": {
+                    "label": "一般使用者",
+                    "description": "可以丟資料、建立本機上傳任務、查看自己的任務狀態。",
+                    "allowed_actions": sorted(ROLE_PERMISSIONS["user"]),
+                },
+                "document_manager": {
+                    "label": "文件管理者",
+                    "description": "可以管理 Project、整理檔案、執行文件上傳與 ETL 任務。",
+                    "allowed_actions": sorted(ROLE_PERMISSIONS["document_manager"]),
+                },
+                "admin": {
+                    "label": "Admin",
+                    "description": "可以管理 Runtime 設定、清儲、log、權限與所有任務。",
+                    "allowed_actions": sorted(ROLE_PERMISSIONS["admin"]),
+                },
+            },
+            "local_users": [
+                {"user_id": "admin", "display_name": "Admin", "role": "admin", "password": "admin123456"},
+                {"user_id": "doc_manager", "display_name": "Document Manager", "role": "document_manager", "password": "doc_manager"},
+                {"user_id": "general_user", "display_name": "General User", "role": "user", "password": "general_user"},
+            ],
+            "anonymous_keys": []
+        }
+        modified = True
+
+    if "roles" not in data:
+        data["roles"] = {
             "user": {
                 "label": "一般使用者",
                 "description": "可以丟資料、建立本機上傳任務、查看自己的任務狀態。",
@@ -187,15 +580,39 @@ def load_or_create_users(config: AppConfig) -> Dict[str, object]:
                 "description": "可以管理 Runtime 設定、清儲、log、權限與所有任務。",
                 "allowed_actions": sorted(ROLE_PERMISSIONS["admin"]),
             },
-        },
-        "local_users": [
-            {"user_id": "admin_user", "display_name": "Admin User", "role": "admin"},
-            {"user_id": "doc_manager", "display_name": "Document Manager", "role": "document_manager"},
-            {"user_id": "general_user", "display_name": "General User", "role": "user"},
-        ],
-    }
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return payload
+        }
+        modified = True
+
+    if "anonymous_keys" not in data:
+        data["anonymous_keys"] = []
+        modified = True
+
+    for k in data.get("anonymous_keys", []):
+        if "key_id" not in k:
+            k["key_id"] = f"anon_key_{uuid.uuid4().hex[:8]}"
+            modified = True
+
+    for u in data.get("local_users", []):
+        if "password" not in u:
+            # Migration: set default password to user_id (predictable) or "admin123456" if it's admin
+            if u.get("user_id") == "admin":
+                u["password"] = "admin123456"
+            else:
+                u["password"] = u.get("user_id", "123456")
+            modified = True
+
+    if modified:
+        data["updated_at"] = now_iso()
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    return data
+
+
+def save_registry_directly(config: AppConfig, data: Dict[str, object]) -> None:
+    path = users_path(config)
+    data["updated_at"] = now_iso()
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
 
 
 def read_runtime_log_records(config: AppConfig) -> list:
@@ -500,7 +917,7 @@ def command_package_template(config: AppConfig) -> Dict[str, object]:
         "version": "0.1",
         "command_id": make_command_id("cmd_upload_folder"),
         "command_type": "upload_folder",
-        "submitter": "admin_user",
+        "submitter": "admin",
         "role": "admin",
         "target_project_id": project_id,
         "source": {
@@ -1575,6 +1992,7 @@ def build_runtime_identity(config: AppConfig) -> Dict[str, object]:
         "lan_ip": lan_ip,
         "lan_url": lan_url,
         "worker_role": "local_runtime_worker",
+        "pid": os.getpid(),
     }
 
 
@@ -1582,8 +2000,8 @@ def read_gas_settings(config: AppConfig) -> Dict[str, object]:
     defaults = {
         "enabled": False,
         "auto_poll_enabled": False,
-        "web_app_url": "",
-        "api_token": "CHANGE_ME_LOCAL_TOKEN",
+        "web_app_url": "https://script.google.com/macros/s/AKfycbw9X3Y6MQ2XpvsS9BXuCZeZsVkrbT1VL0JkDkotrbs-omYG8OpuWpAl1fowiJa_QW1i/exec",
+        "api_token": "123456",
         "poll_interval_seconds": DEFAULT_GAS_POLL_INTERVAL_SECONDS,
         "max_tasks_per_poll": DEFAULT_GAS_MAX_TASKS_PER_POLL,
         "auto_execute": False,
@@ -1696,6 +2114,27 @@ def read_gas_settings_result(config: AppConfig) -> Dict[str, object]:
     }
 
 
+
+import threading
+gas_history_lock = threading.Lock()
+
+def get_gas_url_history(config: AppConfig) -> list:
+    history_file = Path(config.project_root) / "data" / "gas_url_history.json"
+    history_file.parent.mkdir(parents=True, exist_ok=True)
+    with gas_history_lock:
+        if not history_file.exists():
+            return []
+        try:
+            return json.loads(history_file.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+
+def save_gas_url_history(config: AppConfig, history: list) -> None:
+    history_file = Path(config.project_root) / "data" / "gas_url_history.json"
+    history_file.parent.mkdir(parents=True, exist_ok=True)
+    with gas_history_lock:
+        history_file.write_text(json.dumps(history, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
 def gas_auto_worker_loop(config: AppConfig) -> None:
     # Falo x Force 教學註解：
     # 這是地端自動輪詢 worker。它每 N 秒醒來一次，讀取最新設定。
@@ -1707,6 +2146,21 @@ def gas_auto_worker_loop(config: AppConfig) -> None:
             int(settings.get("poll_interval_seconds") or DEFAULT_GAS_POLL_INTERVAL_SECONDS),
         )
         if settings.get("enabled") and settings.get("auto_poll_enabled"):
+            try:
+                from gas_adapter import push_host_info_to_gas
+                push_res = push_host_info_to_gas(config, "scheduled")
+                write_runtime_log(
+                    config,
+                    "gas_auto_push_host_info",
+                    {
+                        "ok": push_res.get("ok", False),
+                        "error": push_res.get("error", "")
+                    }
+                )
+            except Exception as exc:
+                write_runtime_log(config, "gas_auto_push_host_info_error", {"error": str(exc)})
+            
+            # Also run task poll
             try:
                 from gas_adapter import poll_gas_once
 
@@ -2273,11 +2727,558 @@ def execute_folder_upload(config: AppConfig, params: Dict[str, list]) -> Dict[st
     return execute_simple_upload(config, uploaded_files, conflict_policy, project_id=project_id, evidence_root=evidence_root)
 
 
+LOCAL_LOGIN_PAGE_HTML = """<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>FALO Local Web Gateway - Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: rgba(17, 24, 39, 0.75);
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --primary: #10b981;
+      --primary-hover: #059669;
+      --accent: #f97316;
+      --accent-hover: #ea580c;
+      --danger: #ef4444;
+      --glow: rgba(16, 185, 129, 0.15);
+    }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, #111827 0%, #030712 100%);
+      color: var(--text);
+      font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 30px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(12px);
+    }
+    h2 {
+      margin-top: 0;
+      font-weight: 600;
+      color: #fff;
+      text-align: center;
+      letter-spacing: 0.5px;
+    }
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 0.88rem;
+      text-align: center;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+    .field {
+      margin-bottom: 20px;
+    }
+    .field label {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text-muted);
+    }
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      width: 100%;
+    }
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: #fff;
+      padding: 12px 12px;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px var(--glow);
+    }
+    .eye-btn {
+      position: absolute;
+      right: 12px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1.1rem;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      outline: none;
+    }
+    .eye-btn:hover {
+      color: #fff;
+    }
+    button[type="submit"], .btn-submit {
+      width: 100%;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    button[type="submit"]:hover, .btn-submit:hover {
+      background: var(--primary-hover);
+    }
+    .divider {
+      display: flex;
+      align-items: center;
+      text-align: center;
+      margin: 20px 0;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      border-bottom: 1px solid var(--border);
+    }
+    .divider:not(:empty)::before {
+      margin-right: .5em;
+    }
+    .divider:not(:empty)::after {
+      margin-left: .5em;
+    }
+    .btn-anon {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-anon:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .error-msg {
+      color: var(--danger);
+      font-weight: 600;
+      text-align: center;
+      margin-top: 15px;
+      font-size: 0.9rem;
+      min-height: 20px;
+    }
+    
+    /* Modal styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .modal-card {
+      background: #111827;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 30px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+      transform: scale(0.9);
+      transition: transform 0.3s ease;
+    }
+    .modal-overlay.active .modal-card {
+      transform: scale(1);
+    }
+    .modal-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #fff;
+      margin-top: 0;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    .modal-desc {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-bottom: 20px;
+      text-align: center;
+      line-height: 1.5;
+    }
+    .modal-note {
+      background: rgba(249, 115, 22, 0.1);
+      border-left: 3px solid var(--accent);
+      padding: 8px 12px;
+      border-radius: 4px;
+      color: var(--accent);
+      font-size: 0.8rem;
+      margin-bottom: 20px;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+    }
+    .btn-cancel {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .btn-cancel:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    .btn-verify {
+      flex: 1;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .btn-verify:hover {
+      background: var(--accent-hover);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>地端管理閘道驗證</h2>
+    <p class="subtitle">請登入您的使用者帳號與密碼，或選擇匿名登入。</p>
+    <form onsubmit="handleCredentialsLogin(event)">
+      <div class="field">
+        <label for="username">使用者帳號 (Username)</label>
+        <input type="text" id="username" placeholder="請輸入帳號" required autofocus>
+      </div>
+      <div class="field">
+        <label for="password">安全密碼 (Password)</label>
+        <div class="input-wrapper">
+          <input type="password" id="password" placeholder="請輸入密碼" required style="padding-right: 42px;">
+          <button type="button" class="eye-btn" onclick="togglePass()" title="顯示/隱藏密碼">👁️</button>
+        </div>
+      </div>
+      <button type="submit">驗證並登入</button>
+      <div id="error" class="error-msg"></div>
+    </form>
+    
+    <div class="divider">或</div>
+    
+    <button class="btn-anon" onclick="openKeyModal()">👤 匿名登入</button>
+  </div>
+  
+  <!-- Anonymous Key Modal -->
+  <div id="key-modal" class="modal-overlay">
+    <div class="modal-card">
+      <h3 class="modal-title">匿名存取金鑰驗證</h3>
+      <p class="modal-desc">請在下方輸入配發給您的存取金鑰進行匿名登入。</p>
+      <div class="modal-note">
+        <strong>備註：</strong>請提供你的一次性金鑰
+      </div>
+      <div class="field" style="margin-bottom: 24px;">
+        <input type="text" id="key-token" placeholder="請輸入 6 位數字金鑰" maxlength="6" style="text-align: center; font-family: monospace; letter-spacing: 2px;">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeKeyModal()">取消</button>
+        <button class="btn-verify" onclick="handleKeyLogin()">驗證登入</button>
+      </div>
+      <div id="modal-error" class="error-msg" style="margin-top: 15px;"></div>
+    </div>
+  </div>
+
+  <script>
+    function togglePass() {
+      const input = document.getElementById('password');
+      const btn = document.querySelector('.eye-btn');
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '🙈';
+      } else {
+        input.type = 'password';
+        btn.textContent = '👁️';
+      }
+    }
+    
+    function openKeyModal() {
+      document.getElementById('key-modal').classList.add('active');
+      document.getElementById('key-token').focus();
+      document.getElementById('modal-error').textContent = '';
+      document.getElementById('error').textContent = '';
+    }
+    
+    function closeKeyModal() {
+      document.getElementById('key-modal').classList.remove('active');
+      document.getElementById('key-token').value = '';
+    }
+    
+    async function handleCredentialsLogin(e) {
+      e.preventDefault();
+      const user = document.getElementById('username').value;
+      const pass = document.getElementById('password').value;
+      const errEl = document.getElementById('error');
+      errEl.textContent = '';
+      try {
+        const res = await fetch('/api/local-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: user, password: pass })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          window.location.reload();
+        } else {
+          errEl.textContent = data.error || '帳號或密碼錯誤！';
+        }
+      } catch (err) {
+        errEl.textContent = '連線失敗: ' + err;
+      }
+    }
+    
+    async function handleKeyLogin() {
+      const keyVal = document.getElementById('key-token').value.trim();
+      const errEl = document.getElementById('modal-error');
+      errEl.textContent = '';
+      if (!keyVal) {
+        errEl.textContent = '請輸入金鑰！';
+        return;
+      }
+      try {
+        const res = await fetch('/api/local-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key_token: keyVal })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          window.location.reload();
+        } else {
+          errEl.textContent = data.error || '金鑰驗證失敗！';
+        }
+      } catch (err) {
+        errEl.textContent = '連線失敗: ' + err;
+      }
+    }
+  </script>
+</body>
+</html>
+"""
+
+
+LOCAL_403_HTML = """<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>403 Access Denied - FALO Local Web Gateway</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: rgba(17, 24, 39, 0.75);
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --danger: #f97316; /* Amber orange warning color */
+      --primary: #10b981;
+      --glow: rgba(249, 115, 22, 0.15);
+    }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, #111827 0%, #030712 100%);
+      color: var(--text);
+      font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px 30px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(12px);
+      text-align: center;
+    }
+    .icon {
+      font-size: 4rem;
+      margin-bottom: 20px;
+      animation: pulse 2s infinite ease-in-out;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.9; }
+      50% { transform: scale(1.05); opacity: 1; filter: drop-shadow(0 0 10px rgba(249, 115, 22, 0.5)); }
+    }
+    h2 {
+      margin-top: 0;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: 0.5px;
+    }
+    p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+      margin-bottom: 30px;
+    }
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .btn {
+      padding: 12px 24px;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn-primary {
+      background: var(--danger);
+      color: #fff;
+      border: none;
+    }
+    .btn-primary:hover {
+      background: #ea580c;
+      transform: translateY(-1px);
+    }
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: translateY(-1px);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">🔒</div>
+    <h2>403 Access Denied</h2>
+    <p>抱歉，您目前登入的身分沒有存取管理後台的權限。<br>此網頁僅開放給系統管理員 (Admin) 帳號存取。</p>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="relogin()">🔑 使用管理員帳號登入</button>
+      <a class="btn btn-secondary" href="/index.html">🏠 返回系統首頁</a>
+    </div>
+  </div>
+  <script>
+    async function relogin() {
+      try {
+        await fetch('/api/local-logout', { method: 'POST' });
+      } catch (err) {}
+      window.location.href = '/admin.html';
+    }
+  </script>
+</body>
+</html>
+"""
+
+
 def make_handler(config: AppConfig):
     class RuntimeHandler(BaseHTTPRequestHandler):
         def _network_allowed(self) -> bool:
             client_ip = str(self.client_address[0])
             return is_loopback_client(client_ip) or network_access_enabled(config)
+
+        def _get_current_session(self) -> dict:
+            cookie_header = self.headers.get("Cookie", "")
+            import re
+            match = re.search(r'falo_local_session=([^;]+)', cookie_header)
+            if match:
+                sid = match.group(1).strip()
+                return SESSION_DB.get(sid)
+            return None
+
+        def _is_authenticated(self) -> bool:
+            return self._get_current_session() is not None
+
+        def _is_admin(self) -> bool:
+            sess = self._get_current_session()
+            return sess is not None and sess.get("role") == "admin"
+
+        def _send_json_unauthorized(self) -> None:
+            body = json.dumps({"ok": False, "error": "Unauthorized: Please login first."}, ensure_ascii=False).encode("utf-8")
+            self.send_response(401)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def _send_json_forbidden(self) -> None:
+            body = json.dumps({"ok": False, "error": "Forbidden: You do not have permission to perform this action. Only administrators are allowed."}, ensure_ascii=False).encode("utf-8")
+            self.send_response(403)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def _send_html_403(self) -> None:
+            body = LOCAL_403_HTML.encode("utf-8")
+            self.send_response(403)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
 
         def _send_network_blocked(self) -> None:
             body = (
@@ -2295,10 +3296,672 @@ def make_handler(config: AppConfig):
             self.wfile.write(body)
 
         def do_POST(self) -> None:
+            global task_queue_manager
             if not self._network_allowed():
                 self._send_network_blocked()
                 return
             parsed = urlparse(self.path)
+            
+            if parsed.path == "/api/local-login":
+                try:
+                    content_length = int(self.headers.get("Content-Length", 0))
+                    post_data = self.rfile.read(content_length).decode("utf-8")
+                    data = json.loads(post_data)
+                    
+                    registry = load_or_create_users(config)
+                    
+                    username = data.get("username", "").strip()
+                    password = data.get("password", "").strip()
+                    key_token = data.get("key_token", "").strip()
+                    
+                    session_id = uuid.uuid4().hex
+                    
+                    if key_token:
+                        # Validate anonymous key
+                        matched_key = None
+                        for k in registry.get("anonymous_keys", []):
+                            if k.get("key_token") == key_token:
+                                matched_key = k
+                                break
+                        
+                        if not matched_key:
+                            body = json.dumps({"ok": False, "error": "金鑰無效！"}, ensure_ascii=False).encode("utf-8")
+                            self.send_response(200)
+                            self.send_header("Content-Type", "application/json; charset=utf-8")
+                            self.send_header("Content-Length", str(len(body)))
+                            self.end_headers()
+                            self.wfile.write(body)
+                            return
+                            
+                        if matched_key.get("status") != "active":
+                            body = json.dumps({"ok": False, "error": "此金鑰已被停用！"}, ensure_ascii=False).encode("utf-8")
+                            self.send_response(200)
+                            self.send_header("Content-Type", "application/json; charset=utf-8")
+                            self.send_header("Content-Length", str(len(body)))
+                            self.end_headers()
+                            self.wfile.write(body)
+                            return
+                        
+                        # Update last_used_at
+                        matched_key["last_used_at"] = now_iso()
+                        
+                        # Decouple key_token from key_id to allow rotation without losing session data/settings
+                        key_id = matched_key.get("key_id")
+                        if not key_id:
+                            key_id = f"anon_key_{uuid.uuid4().hex[:8]}"
+                            matched_key["key_id"] = key_id
+                            
+                        save_registry_directly(config, registry)
+                        
+                        # Set session with the persistent key_id
+                        SESSION_DB[session_id] = {
+                            "user_id": key_id,
+                            "display_name": f"訪客 ({matched_key.get('alias', '未命名')})",
+                            "role": "user",
+                            "login_type": "key",
+                            "key_token": key_token
+                        }
+                        
+                        # Log it
+                        write_runtime_log(config, "user_login_key", {
+                            "key_token": key_token,
+                            "alias": matched_key.get("alias"),
+                            "session_id": session_id
+                        })
+                        
+                        body = json.dumps({"ok": True}).encode("utf-8")
+                        self.send_response(200)
+                        self.send_header("Set-Cookie", f"falo_local_session={session_id}; Path=/; Max-Age=86400; HttpOnly")
+                        self.send_header("Content-Type", "application/json; charset=utf-8")
+                        self.send_header("Content-Length", str(len(body)))
+                        self.end_headers()
+                        self.wfile.write(body)
+                        return
+                    else:
+                        # Credentials login
+                        if not username:
+                            body = json.dumps({"ok": False, "error": "請輸入使用者帳號！"}, ensure_ascii=False).encode("utf-8")
+                            self.send_response(200)
+                            self.send_header("Content-Type", "application/json; charset=utf-8")
+                            self.send_header("Content-Length", str(len(body)))
+                            self.end_headers()
+                            self.wfile.write(body)
+                            return
+                            
+                        matched_user = None
+                        for u in registry.get("local_users", []):
+                            if u.get("user_id") == username:
+                                matched_user = u
+                                break
+                        
+                        if not matched_user or matched_user.get("password") != password:
+                            body = json.dumps({"ok": False, "error": "帳號或密碼錯誤！"}, ensure_ascii=False).encode("utf-8")
+                            self.send_response(200)
+                            self.send_header("Content-Type", "application/json; charset=utf-8")
+                            self.send_header("Content-Length", str(len(body)))
+                            self.end_headers()
+                            self.wfile.write(body)
+                            return
+                        
+                        # Set session
+                        SESSION_DB[session_id] = {
+                            "user_id": matched_user.get("user_id"),
+                            "display_name": matched_user.get("display_name", username),
+                            "role": matched_user.get("role", "user"),
+                            "login_type": "credentials",
+                            "key_token": None
+                        }
+                        
+                        # Log it
+                        write_runtime_log(config, "user_login_credentials", {
+                            "user_id": username,
+                            "display_name": matched_user.get("display_name"),
+                            "role": matched_user.get("role"),
+                            "session_id": session_id
+                        })
+                        
+                        body = json.dumps({"ok": True}).encode("utf-8")
+                        self.send_response(200)
+                        self.send_header("Set-Cookie", f"falo_local_session={session_id}; Path=/; Max-Age=86400; HttpOnly")
+                        self.send_header("Content-Type", "application/json; charset=utf-8")
+                        self.send_header("Content-Length", str(len(body)))
+                        self.end_headers()
+                        self.wfile.write(body)
+                        return
+                except Exception as e:
+                    body = json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False).encode("utf-8")
+                    self.send_response(400)
+                    self.send_header("Content-Type", "application/json; charset=utf-8")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                return
+
+            if parsed.path == "/api/local-logout":
+                cookie_header = self.headers.get("Cookie", "")
+                import re
+                match = re.search(r'falo_local_session=([^;]+)', cookie_header)
+                if match:
+                    sid = match.group(1).strip()
+                    if sid in SESSION_DB:
+                        del SESSION_DB[sid]
+                body = json.dumps({"ok": True}).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Set-Cookie", "falo_local_session=; Path=/; Max-Age=0; HttpOnly")
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+
+            if not self._is_authenticated():
+                self._send_json_unauthorized()
+                return
+
+            if parsed.path.startswith("/api/admin/"):
+                if not self._is_admin():
+                    self._send_json_forbidden()
+                    return
+
+            if parsed.path == "/api/admin/users/save":
+                try:
+                    content_length = int(self.headers.get("Content-Length", 0))
+                    post_data = self.rfile.read(content_length).decode("utf-8")
+                    data = json.loads(post_data)
+                    
+                    local_users = data.get("local_users")
+                    anonymous_keys = data.get("anonymous_keys")
+                    
+                    registry = load_or_create_users(config)
+                    if local_users is not None:
+                        registry["local_users"] = local_users
+                    if anonymous_keys is not None:
+                        registry["anonymous_keys"] = anonymous_keys
+                    
+                    # Ensure there is always at least one admin!
+                    has_admin = False
+                    for u in registry.get("local_users", []):
+                        if u.get("role") == "admin":
+                            has_admin = True
+                            break
+                    if not has_admin:
+                        body = json.dumps({"ok": False, "error": "必須保留至少一個 Admin 帳號！"}, ensure_ascii=False).encode("utf-8")
+                        self.send_response(200)
+                        self.send_header("Content-Type", "application/json; charset=utf-8")
+                        self.send_header("Content-Length", str(len(body)))
+                        self.end_headers()
+                        self.wfile.write(body)
+                        return
+                    
+                    # Ensure all users have passwords
+                    for u in registry.get("local_users", []):
+                        if not u.get("password"):
+                            u["password"] = u.get("user_id", "123456")
+                            
+                    save_registry_directly(config, registry)
+                    write_runtime_log(config, "admin_users_save", {
+                        "user_count": len(registry.get("local_users", [])),
+                        "key_count": len(registry.get("anonymous_keys", []))
+                    })
+                    body = json.dumps({"ok": True}).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json; charset=utf-8")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                except Exception as e:
+                    body = json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False).encode("utf-8")
+                    self.send_response(400)
+                    self.send_header("Content-Type", "application/json; charset=utf-8")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                return
+
+            elif parsed.path == "/api/admin/users/import":
+                content_type = self.headers.get("Content-Type", "")
+                if "multipart/form-data" not in content_type:
+                    self._send_json({"ok": False, "error": "Must use multipart/form-data."})
+                    return
+                
+                try:
+                    form = cgi.FieldStorage(
+                        fp=self.rfile,
+                        headers=self.headers,
+                        environ={
+                            "REQUEST_METHOD": "POST",
+                            "CONTENT_TYPE": content_type,
+                            "CONTENT_LENGTH": self.headers.get("Content-Length", "0"),
+                        },
+                    )
+                    file_field = form["file"] if "file" in form else None
+                    if file_field is None or not getattr(file_field, "filename", ""):
+                        self._send_json({"ok": False, "error": "No file uploaded."})
+                        return
+                    
+                    temp_dir = Path(config.project_root) / "data" / "temp"
+                    temp_dir.mkdir(parents=True, exist_ok=True)
+                    temp_path = temp_dir / f"import_users_{uuid.uuid4().hex[:8]}.xlsx"
+                    with temp_path.open("wb") as handle:
+                        while True:
+                            chunk = file_field.file.read(8192)
+                            if not chunk:
+                                break
+                            handle.write(chunk)
+                    
+                    import openpyxl
+                    wb = openpyxl.load_workbook(temp_path)
+                    registry = load_or_create_users(config)
+                    
+                    # Process 本地使用者 sheet
+                    imported_users_new = 0
+                    imported_users_updated = 0
+                    if "本地使用者" in wb.sheetnames:
+                        ws = wb["本地使用者"]
+                        rows = list(ws.iter_rows(values_only=True))
+                        if len(rows) > 1:
+                            local_users = registry.get("local_users", [])
+                            for row in rows[1:]:
+                                if not row or len(row) < 1:
+                                    continue
+                                user_id = str(row[0] or "").strip()
+                                if not user_id:
+                                    continue
+                                display_name = str(row[1] or "").strip() or user_id
+                                password = str(row[2] or "").strip() or "123456"
+                                role = str(row[3] or "").strip()
+                                if role not in {"user", "document_manager", "admin"}:
+                                    role = "user"
+                                
+                                found = False
+                                for u in local_users:
+                                    if u.get("user_id") == user_id:
+                                        u["display_name"] = display_name
+                                        u["password"] = password
+                                        u["role"] = role
+                                        imported_users_updated += 1
+                                        found = True
+                                        break
+                                if not found:
+                                    local_users.append({
+                                        "user_id": user_id,
+                                        "display_name": display_name,
+                                        "password": password,
+                                        "role": role
+                                    })
+                                    imported_users_new += 1
+                            registry["local_users"] = local_users
+
+                    # Process 匿名金鑰 sheet
+                    imported_keys_new = 0
+                    imported_keys_updated = 0
+                    skipped_keys = 0
+                    if "匿名金鑰" in wb.sheetnames:
+                        ws = wb["匿名金鑰"]
+                        rows = list(ws.iter_rows(values_only=True))
+                        if len(rows) > 1:
+                            anonymous_keys = registry.get("anonymous_keys", [])
+                            for row in rows[1:]:
+                                if not row or len(row) < 1:
+                                    continue
+                                token = str(row[0] or "").strip()
+                                if not token:
+                                    continue
+                                import re
+                                if not re.match(r"^[1-9]\d{5}$", token):
+                                    skipped_keys += 1
+                                    continue
+                                
+                                alias = str(row[1] or "").strip() or "未命名用途"
+                                status = str(row[2] or "").strip()
+                                if status not in {"active", "disabled"}:
+                                    status = "active"
+                                    
+                                key_id = str(row[3] or "").strip() if len(row) > 3 else ""
+                                created_at = str(row[4] or "").strip() if len(row) > 4 else ""
+                                last_used_at = str(row[5] or "").strip() if len(row) > 5 else ""
+                                
+                                found = False
+                                for k in anonymous_keys:
+                                    if (key_id and k.get("key_id") == key_id) or (not key_id and k.get("key_token") == token):
+                                        k["key_token"] = token
+                                        k["alias"] = alias
+                                        k["status"] = status
+                                        if last_used_at:
+                                            k["last_used_at"] = last_used_at
+                                        imported_keys_updated += 1
+                                        found = True
+                                        break
+                                if not found:
+                                    if not key_id:
+                                        key_id = f"anon_key_{uuid.uuid4().hex[:8]}"
+                                    anonymous_keys.append({
+                                        "key_id": key_id,
+                                        "key_token": token,
+                                        "alias": alias,
+                                        "status": status,
+                                        "created_at": created_at or now_iso(),
+                                        "last_used_at": last_used_at or None
+                                    })
+                                    imported_keys_new += 1
+                            registry["anonymous_keys"] = anonymous_keys
+                            
+                    # Ensure there is always at least one admin!
+                    has_admin = False
+                    for u in registry.get("local_users", []):
+                        if u.get("role") == "admin":
+                            has_admin = True
+                            break
+                    if not has_admin:
+                        self._send_json({"ok": False, "error": "匯入的帳號中必須包含至少一個 Admin 帳號！"})
+                        return
+                    
+                    save_registry_directly(config, registry)
+                    
+                    try:
+                        temp_path.unlink()
+                    except Exception:
+                        pass
+                        
+                    msg = f"匯入完成！使用者：新增 {imported_users_new} 個，更新 {imported_users_updated} 個。金鑰：新增 {imported_keys_new} 個，更新 {imported_keys_updated} 個。"
+                    if skipped_keys > 0:
+                        msg += f"（已跳過 {skipped_keys} 組格式不合規的金鑰，金鑰必須為6位純數字且不能以0開頭）"
+                    self._send_json({"ok": True, "message": msg})
+                except Exception as e:
+                    self._send_json({"ok": False, "error": str(e)})
+                return
+
+            elif parsed.path == "/api/admin/users/clear":
+                sess = self._get_current_session()
+                if not sess:
+                    self._send_json({"ok": False, "error": "No active session"})
+                    return
+                current_user = sess.get("user_id")
+                
+                try:
+                    registry = load_or_create_users(config)
+                    filtered_users = [u for u in registry.get("local_users", []) if u.get("user_id") == current_user]
+                    if not filtered_users:
+                        filtered_users = [{"user_id": current_user, "display_name": sess.get("display_name", "Admin"), "role": "admin", "password": "admin123456"}]
+                    registry["local_users"] = filtered_users
+                    registry["anonymous_keys"] = []
+                    
+                    save_registry_directly(config, registry)
+                    self._send_json({"ok": True})
+                except Exception as e:
+                    self._send_json({"ok": False, "error": str(e)})
+                return
+
+            elif parsed.path == "/api/admin/audit-logs/import":
+                content_type = self.headers.get("Content-Type", "")
+                if "multipart/form-data" not in content_type:
+                    self._send_json({"ok": False, "error": "Must use multipart/form-data."})
+                    return
+                
+                try:
+                    form = cgi.FieldStorage(
+                        fp=self.rfile,
+                        headers=self.headers,
+                        environ={
+                            "REQUEST_METHOD": "POST",
+                            "CONTENT_TYPE": content_type,
+                            "CONTENT_LENGTH": self.headers.get("Content-Length", "0"),
+                        },
+                    )
+                    file_field = form["file"] if "file" in form else None
+                    if file_field is None or not getattr(file_field, "filename", ""):
+                        self._send_json({"ok": False, "error": "No file uploaded."})
+                        return
+                    
+                    temp_dir = Path(config.project_root) / "data" / "temp"
+                    temp_dir.mkdir(parents=True, exist_ok=True)
+                    temp_path = temp_dir / f"import_logs_{uuid.uuid4().hex[:8]}.xlsx"
+                    with temp_path.open("wb") as handle:
+                        while True:
+                            chunk = file_field.file.read(8192)
+                            if not chunk:
+                                break
+                            handle.write(chunk)
+                    
+                    import openpyxl
+                    wb = openpyxl.load_workbook(temp_path)
+                    
+                    sheet_name = "對話審計紀錄" if "對話審計紀錄" in wb.sheetnames else wb.sheetnames[0]
+                    ws = wb[sheet_name]
+                    rows = list(ws.iter_rows(values_only=True))
+                    
+                    imported_nlm_new = 0
+                    imported_nlm_updated = 0
+                    imported_gemini_new = 0
+                    imported_gemini_updated = 0
+                    
+                    if len(rows) > 1:
+                        # Parse headers
+                        headers = [str(cell or "").strip() for cell in rows[0]]
+                        idx_platform = 0
+                        idx_cid = 1
+                        idx_user_name = 2
+                        idx_user_id = 3 if "帳號" in "".join(headers) else -1
+                        
+                        if idx_user_id == 3:
+                            idx_remark = 4
+                            idx_notebook_id = 5
+                            idx_last_question = 6
+                            idx_last_query_at = 7
+                        else:
+                            idx_remark = 3
+                            idx_notebook_id = 4
+                            idx_last_question = 5
+                            idx_last_query_at = 6
+
+                        nlm_file = Path(config.project_root) / "data" / "multichat_sessions.json"
+                        gemini_file = Path(config.project_root) / "data" / "gemini_sessions.json"
+                        
+                        nlm_data = {"sessions": {}}
+                        if nlm_file.exists():
+                            try:
+                                with open(nlm_file, "r", encoding="utf-8") as f:
+                                    nlm_data = json.load(f)
+                            except Exception:
+                                pass
+                        if "sessions" not in nlm_data:
+                            nlm_data["sessions"] = {}
+                            
+                        gemini_data = {"sessions": {}}
+                        if gemini_file.exists():
+                            try:
+                                with open(gemini_file, "r", encoding="utf-8") as f:
+                                    gemini_data = json.load(f)
+                            except Exception:
+                                pass
+                        if "sessions" not in gemini_data:
+                            gemini_data["sessions"] = {}
+                            
+                        for row in rows[1:]:
+                            if not row or len(row) < 2:
+                                continue
+                            platform = str(row[idx_platform] or "notebooklm").strip().lower()
+                            cid = str(row[idx_cid] or "").strip()
+                            if not cid:
+                                continue
+                            
+                            user_name = str(row[idx_user_name] or "Unknown").strip()
+                            user_id = str(row[idx_user_id] or "").strip() if (idx_user_id != -1 and len(row) > idx_user_id) else ""
+                            remark = str(row[idx_remark] or "").strip() if len(row) > idx_remark else ""
+                            notebook_id = str(row[idx_notebook_id] or "").strip() if len(row) > idx_notebook_id else ""
+                            last_question = str(row[idx_last_question] or "").strip() if len(row) > idx_last_question else ""
+                            last_query_at = str(row[idx_last_query_at] or "").strip() if (len(row) > idx_last_query_at and row[idx_last_query_at]) else now_iso()
+                            
+                            if platform == "notebooklm":
+                                sessions = nlm_data["sessions"]
+                                if cid in sessions:
+                                    sessions[cid]["user_name"] = user_name
+                                    sessions[cid]["user_id"] = user_id
+                                    sessions[cid]["remark"] = remark
+                                    sessions[cid]["notebook_id"] = notebook_id
+                                    sessions[cid]["last_query_at"] = last_query_at
+                                    imported_nlm_updated += 1
+                                else:
+                                    turns = [{"role": "user", "content": last_question}] if last_question else []
+                                    sessions[cid] = {
+                                        "user_id": user_id,
+                                        "user_name": user_name,
+                                        "notebook_id": notebook_id,
+                                        "created_at": last_query_at,
+                                        "last_query_at": last_query_at,
+                                        "remark": remark,
+                                        "turns": turns
+                                    }
+                                    imported_nlm_new += 1
+                            else:
+                                sessions = gemini_data["sessions"]
+                                if cid in sessions:
+                                    sessions[cid]["user_name"] = user_name
+                                    sessions[cid]["user_id"] = user_id
+                                    sessions[cid]["remark"] = remark
+                                    sessions[cid]["last_query_at"] = last_query_at
+                                    imported_gemini_updated += 1
+                                else:
+                                    turns = [{"role": "user", "content": last_question}] if last_question else []
+                                    sessions[cid] = {
+                                        "user_id": user_id,
+                                        "user_name": user_name,
+                                        "created_at": last_query_at,
+                                        "last_query_at": last_query_at,
+                                        "remark": remark,
+                                        "turns": turns,
+                                        "metadata": []
+                                    }
+                                    imported_gemini_new += 1
+                                    
+                        nlm_file.parent.mkdir(parents=True, exist_ok=True)
+                        with open(nlm_file, "w", encoding="utf-8") as f:
+                            json.dump(nlm_data, f, ensure_ascii=False, indent=2)
+                        with open(gemini_file, "w", encoding="utf-8") as f:
+                            json.dump(gemini_data, f, ensure_ascii=False, indent=2)
+                            
+                    try:
+                        temp_path.unlink()
+                    except Exception:
+                        pass
+                        
+                    msg = f"審計紀錄匯入完成！NotebookLM：新增 {imported_nlm_new} 筆，更新 {imported_nlm_updated} 筆。Gemini：新增 {imported_gemini_new} 筆，更新 {imported_gemini_updated} 筆。"
+                    self._send_json({"ok": True, "message": msg})
+                except Exception as e:
+                    self._send_json({"ok": False, "error": str(e)})
+                return
+
+            elif parsed.path == "/api/admin/audit-logs/clear":
+                try:
+                    nlm_file = Path(config.project_root) / "data" / "multichat_sessions.json"
+                    with open(nlm_file, "w", encoding="utf-8") as f:
+                        json.dump({"sessions": {}}, f, ensure_ascii=False, indent=2)
+                    
+                    gemini_file = Path(config.project_root) / "data" / "gemini_sessions.json"
+                    with open(gemini_file, "w", encoding="utf-8") as f:
+                        json.dump({"sessions": {}}, f, ensure_ascii=False, indent=2)
+                        
+                    self._send_json({"ok": True})
+                except Exception as e:
+                    self._send_json({"ok": False, "error": str(e)})
+                return
+
+            if parsed.path == "/api/admin/selectable-notebooks/save":
+                content_length = int(self.headers.get("Content-Length", 0))
+                post_data = self.rfile.read(content_length).decode("utf-8")
+                try:
+                    data = json.loads(post_data)
+                except Exception:
+                    from urllib.parse import parse_qs
+                    params = parse_qs(post_data)
+                    notebook_ids = params.get("notebook_ids", [])
+                    if len(notebook_ids) == 1 and "," in notebook_ids[0]:
+                        notebook_ids = [x.strip() for x in notebook_ids[0].split(",") if x.strip()]
+                    data = {
+                        "mode": params.get("mode", ["all"])[0].strip(),
+                        "notebook_ids": notebook_ids
+                    }
+                
+                mode = data.get("mode", "all").strip()
+                notebook_ids = data.get("notebook_ids", [])
+                if not isinstance(notebook_ids, list):
+                    if isinstance(notebook_ids, str):
+                        notebook_ids = [x.strip() for x in notebook_ids.split(",") if x.strip()]
+                    else:
+                        notebook_ids = []
+                
+                allowed_path = config_dir(config) / "selectable_books.json"
+                allowed_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                try:
+                    allowed_path.write_text(json.dumps({
+                        "app": "AI NotebookLM Runtime Lab",
+                        "kind": "selectable_books",
+                        "mode": mode,
+                        "updated_at": now_iso(),
+                        "notebook_ids": notebook_ids
+                    }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                    self._send_json({"ok": True})
+                except Exception as e:
+                    self._send_json({"ok": False, "error": str(e)})
+                return
+
+            if parsed.path == "/api/session/remark":
+                content_length = int(self.headers.get("Content-Length", 0))
+                post_data = self.rfile.read(content_length).decode("utf-8")
+                try:
+                    data = json.loads(post_data)
+                except Exception:
+                    from urllib.parse import parse_qs
+                    params = parse_qs(post_data)
+                    data = {
+                        "conversation_id": params.get("conversation_id", [""])[0].strip(),
+                        "type": params.get("type", [""])[0].strip(),
+                        "remark": params.get("remark", [""])[0].strip()
+                    }
+                
+                conversation_id = data.get("conversation_id", "").strip()
+                sess_type = data.get("type", "").strip() # 'nlm' or 'gemini'
+                remark = data.get("remark", "").strip()
+                
+                if not conversation_id or not sess_type:
+                    self._send_json({"ok": False, "error": "Conversation ID and type are required."})
+                    return
+                
+                filename = "multichat_sessions.json" if sess_type == "nlm" else "gemini_sessions.json"
+                sessions_file = Path(config.project_root) / "data" / filename
+                
+                sessions_data = {"sessions": {}}
+                if sessions_file.exists():
+                    try:
+                        with open(sessions_file, "r", encoding="utf-8") as f:
+                            sessions_data = json.load(f)
+                    except Exception:
+                        pass
+                
+                if "sessions" not in sessions_data:
+                    sessions_data["sessions"] = {}
+                
+                if conversation_id not in sessions_data["sessions"]:
+                    sessions_data["sessions"][conversation_id] = {
+                        "conversation_id": conversation_id,
+                        "turns": [],
+                        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "last_query_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "user_name": "System"
+                    }
+                
+                sessions_data["sessions"][conversation_id]["remark"] = remark
+                
+                try:
+                    sessions_file.parent.mkdir(parents=True, exist_ok=True)
+                    with open(sessions_file, "w", encoding="utf-8") as f:
+                        json.dump(sessions_data, f, ensure_ascii=False, indent=2)
+                    self._send_json({"ok": True})
+                except Exception as e:
+                    self._send_json({"ok": False, "error": str(e)})
+                return
+
             if parsed.path == "/api/simple-upload":
                 self._send_html(render_simple_upload_result(handle_simple_upload_post(config, self)))
             elif parsed.path == "/api/convert-meeting":
@@ -2336,87 +3999,216 @@ def make_handler(config: AppConfig):
                 conversation_id = params.get("conversation_id", [""])[0].strip()
                 question = params.get("question", [""])[0].strip()
 
-                if not notebook_id or not user_name or not question:
+                sess = self._get_current_session()
+                user_id = sess.get("user_id") if sess else "unknown_user"
+                active_user_name = sess.get("display_name") if (sess and sess.get("display_name")) else user_name
+
+                if not notebook_id or not active_user_name or not question:
                     self._send_json({"ok": False, "error": "Notebook ID, User Name, and Question are required."})
                     return
 
-                import sys
-                import subprocess
-                import json
-                
-                helper_path = Path(config.project_root) / "ask_helper.py"
-                cmd = [sys.executable, str(helper_path), "-n", notebook_id, "-q", question]
                 if conversation_id and conversation_id != "new":
-                    cmd.extend(["-c", conversation_id])
-                
-                try:
-                    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-                    if result.returncode != 0:
-                        self._send_json({"ok": False, "error": f"Helper execution failed: {result.stderr or result.stdout}"})
-                        return
-
-                    try:
-                        result_data = json.loads(result.stdout)
-                    except Exception as je:
-                        self._send_json({"ok": False, "error": f"Failed to parse helper output: {result.stdout}, err: {str(je)}"})
-                        return
-                    
-                    if not result_data.get("ok"):
-                        self._send_json({"ok": False, "error": result_data.get("error", "Unknown helper error")})
-                        return
-
-                    answer = result_data["answer"]
-                    resolved_conv_id = result_data["conversation_id"]
-
                     sessions_file = Path(config.project_root) / "data" / "multichat_sessions.json"
-                    import datetime
-                    
-                    data = {"sessions": {}}
                     if sessions_file.exists():
                         try:
                             with open(sessions_file, "r", encoding="utf-8") as f:
                                 data = json.load(f)
+                            if "sessions" in data and conversation_id in data["sessions"]:
+                                session_info = data["sessions"][conversation_id]
+                                owner_id = session_info.get("user_id")
+                                owner_name = session_info.get("user_name")
+                                is_owner = (owner_id == user_id) or (not owner_id and owner_name == active_user_name)
+                                if not is_owner:
+                                    self._send_json({"ok": False, "error": "Access denied: cannot participate in a session belonging to another user."})
+                                    return
                         except Exception:
                             pass
-                    
-                    if "sessions" not in data:
-                        data["sessions"] = {}
-                        
-                    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    
-                    if resolved_conv_id not in data["sessions"]:
-                        data["sessions"][resolved_conv_id] = {
-                            "user_name": user_name,
-                            "notebook_id": notebook_id,
-                            "created_at": now_str,
-                            "last_query_at": now_str,
-                            "turns": []
-                        }
-                    else:
-                        data["sessions"][resolved_conv_id]["last_query_at"] = now_str
-                        data["sessions"][resolved_conv_id]["user_name"] = user_name
-                        
-                    data["sessions"][resolved_conv_id]["turns"].append({
-                        "role": "user",
-                        "content": question,
-                        "timestamp": now_str
-                    })
-                    data["sessions"][resolved_conv_id]["turns"].append({
-                        "role": "assistant",
-                        "content": answer,
-                        "timestamp": now_str
-                    })
-                    
-                    with open(sessions_file, "w", encoding="utf-8") as f:
-                        json.dump(data, f, ensure_ascii=False, indent=2)
 
+                if task_queue_manager is None:
+                    self._send_json({"ok": False, "error": "Task queue manager is not initialized."})
+                    return
+
+                payload = {
+                    "notebook_id": notebook_id,
+                    "user_name": active_user_name,
+                    "user_id": user_id,
+                    "conversation_id": conversation_id,
+                    "question": question
+                }
+                task_id = task_queue_manager.add_task("notebooklm", active_user_name, payload)
+                detail = task_queue_manager.get_task_status_detail(task_id)
+                self._send_json({
+                    "ok": True,
+                    "task_id": task_id,
+                    "status": "pending",
+                    "queue_position": detail.get("queue_position", 0),
+                    "eta_seconds": detail.get("eta_seconds", 0)
+                })
+            elif parsed.path == "/api/gas/settings/save":
+                content_length = int(self.headers.get("Content-Length", 0))
+                post_data = self.rfile.read(content_length).decode("utf-8")
+                from urllib.parse import parse_qs
+                params = parse_qs(post_data)
+                
+                settings = read_gas_settings(config)
+                web_app_url = params.get("web_app_url", [""])[0].strip()
+                api_token = params.get("api_token", [""])[0].strip()
+                poll_interval = params.get("poll_interval_seconds", ["300"])[0].strip()
+                enabled = params.get("enabled", ["false"])[0].strip().lower() in {"true", "1", "on"}
+                auto_poll = params.get("auto_poll_enabled", ["false"])[0].strip().lower() in {"true", "1", "on"}
+                
+                settings["web_app_url"] = web_app_url
+                settings["api_token"] = api_token
+                settings["poll_interval_seconds"] = int(poll_interval) if poll_interval.isdigit() else 300
+                settings["enabled"] = enabled
+                settings["auto_poll_enabled"] = auto_poll
+                
+                write_gas_settings(config, settings)
+                self._send_json({"ok": True, "settings": settings})
+            elif parsed.path == "/api/gas/push-host-info":
+                from gas_adapter import push_host_info_to_gas, detect_wan_url
+                res = push_host_info_to_gas(config, "manual")
+                wan_url = detect_wan_url(RUNTIME_BIND_PORT)
+                self._send_json({"ok": res.get("ok", False), "wan_url": wan_url, "response": res})
+            elif parsed.path == "/api/gas/history/save":
+                content_length = int(self.headers.get("Content-Length", 0))
+                post_data = self.rfile.read(content_length).decode("utf-8")
+                from urllib.parse import parse_qs
+                params = parse_qs(post_data)
+                url = params.get("url", [""])[0].strip()
+                alias = params.get("alias", [""])[0].strip()
+                action = params.get("action", ["save"])[0].strip()
+                
+                if not url:
+                    self._send_json({"ok": False, "error": "URL is required."})
+                    return
+                
+                history = get_gas_url_history(config)
+                if action == "delete":
+                    history = [item for item in history if item.get("url") != url]
+                else:
+                    found = False
+                    for item in history:
+                        if item.get("url") == url:
+                            item["alias"] = alias
+                            item["last_used_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                            found = True
+                            break
+                    if not found:
+                        history.append({
+                            "url": url,
+                            "alias": alias,
+                            "added_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                            "last_used_at": time.strftime("%Y-%m-%d %H:%M:%S")
+                        })
+                
+                save_gas_url_history(config, history)
+                self._send_json({"ok": True})
+            elif parsed.path == "/api/gas/history/clear":
+                save_gas_url_history(config, [])
+                self._send_json({"ok": True})
+            elif parsed.path == "/api/gas/history/import":
+                content_type = self.headers.get("Content-Type", "")
+                if "multipart/form-data" not in content_type:
+                    self._send_json({"ok": False, "error": "Must use multipart/form-data."})
+                    return
+                
+                try:
+                    form = cgi.FieldStorage(
+                        fp=self.rfile,
+                        headers=self.headers,
+                        environ={
+                            "REQUEST_METHOD": "POST",
+                            "CONTENT_TYPE": content_type,
+                            "CONTENT_LENGTH": self.headers.get("Content-Length", "0"),
+                        },
+                    )
+                    file_field = form["file"] if "file" in form else None
+                    if file_field is None or not getattr(file_field, "filename", ""):
+                        self._send_json({"ok": False, "error": "No file uploaded."})
+                        return
+                    
+                    # Write file temporarily
+                    temp_dir = Path(config.project_root) / "data" / "temp"
+                    temp_dir.mkdir(parents=True, exist_ok=True)
+                    temp_path = temp_dir / "import_temp.xlsx"
+                    with temp_path.open("wb") as handle:
+                        while True:
+                            chunk = file_field.file.read(8192)
+                            if not chunk:
+                                break
+                            handle.write(chunk)
+                    
+                    # Parse using openpyxl
+                    import openpyxl
+                    wb = openpyxl.load_workbook(temp_path)
+                    ws = wb.active
+                    rows = list(ws.iter_rows(values_only=True))
+                    if len(rows) < 2:
+                        self._send_json({"ok": False, "error": "Excel sheet is empty or invalid."})
+                        return
+                    
+                    # Assume row 0 is header: URL, Alias, Added At, Last Used At
+                    history = get_gas_url_history(config)
+                    imported_count = 0
+                    updated_count = 0
+                    
+                    for row in rows[1:]:
+                        if not row or len(row) < 1:
+                            continue
+                        url = str(row[0] or "").strip()
+                        if not url or not url.startswith("http"):
+                            continue
+                            
+                        alias = str(row[1] or "").strip() if len(row) > 1 else ""
+                        added_at = str(row[2] or "").strip() if len(row) > 2 else time.strftime("%Y-%m-%d %H:%M:%S")
+                        last_used_at = str(row[3] or "").strip() if len(row) > 3 else time.strftime("%Y-%m-%d %H:%M:%S")
+                        
+                        # Find existing
+                        found = False
+                        for item in history:
+                            if item.get("url") == url:
+                                # Update only if alias is different (upsert strategy)
+                                if item.get("alias") != alias:
+                                    item["alias"] = alias
+                                    item["last_used_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                                    updated_count += 1
+                                found = True
+                                break
+                        if not found:
+                            history.append({
+                                "url": url,
+                                "alias": alias,
+                                "added_at": added_at or time.strftime("%Y-%m-%d %H:%M:%S"),
+                                "last_used_at": last_used_at or time.strftime("%Y-%m-%d %H:%M:%S")
+                            })
+                            imported_count += 1
+                            
+                    save_gas_url_history(config, history)
+                    
+                    # Clean temp
+                    try:
+                        temp_path.unlink()
+                    except Exception:
+                        pass
+                        
                     self._send_json({
-                        "ok": True,
-                        "answer": answer,
-                        "conversation_id": resolved_conv_id
+                        "ok": True, 
+                        "imported": imported_count, 
+                        "updated": updated_count,
+                        "message": f"匯入成功：新增 {imported_count} 筆，更新 {updated_count} 筆不同網址的備註。"
                     })
-                except Exception as e:
-                    self._send_json({"ok": False, "error": str(e)})
+                except Exception as ex:
+                    import traceback
+                    traceback.print_exc()
+                    self._send_json({"ok": False, "error": f"匯入失敗: {ex}"})
+                return
+            elif parsed.path == "/api/queue/clear":
+                if task_queue_manager is None:
+                    self._send_json({"ok": False, "error": "Task queue manager is not initialized."})
+                    return
+                task_queue_manager.clear_queue()
+                self._send_json({"ok": True})
             elif parsed.path == "/api/multichat/delete":
                 content_length = int(self.headers.get("Content-Length", 0))
                 post_data = self.rfile.read(content_length).decode("utf-8")
@@ -2428,12 +4220,25 @@ def make_handler(config: AppConfig):
                     self._send_json({"ok": False, "error": "Conversation ID is required."})
                     return
 
+                sess = self._get_current_session()
+                current_user_id = sess.get("user_id") if sess else None
+                current_display_name = sess.get("display_name") if sess else None
+                current_role = sess.get("role") if sess else "user"
+
                 sessions_file = Path(config.project_root) / "data" / "multichat_sessions.json"
                 if sessions_file.exists():
                     try:
                         with open(sessions_file, "r", encoding="utf-8") as f:
                             data = json.load(f)
                         if "sessions" in data and conversation_id in data["sessions"]:
+                            session_info = data["sessions"][conversation_id]
+                            if current_role != "admin":
+                                owner_id = session_info.get("user_id")
+                                owner_name = session_info.get("user_name")
+                                is_owner = (owner_id == current_user_id) or (not owner_id and owner_name == current_display_name)
+                                if not is_owner:
+                                    self._send_json({"ok": False, "error": "Access denied: cannot delete session belonging to another user."})
+                                    return
                             del data["sessions"][conversation_id]
                             with open(sessions_file, "w", encoding="utf-8") as f:
                                 json.dump(data, f, ensure_ascii=False, indent=2)
@@ -2449,91 +4254,64 @@ def make_handler(config: AppConfig):
                 user_name = params.get("user_name", [""])[0].strip()
                 question = params.get("question", [""])[0].strip()
                 metadata = params.get("metadata", [""])[0].strip()
+                model = params.get("model", [""])[0].strip()
+                thinking = params.get("thinking", [""])[0].strip()
 
-                if not user_name or not question:
+                sess = self._get_current_session()
+                user_id = sess.get("user_id") if sess else "unknown_user"
+                active_user_name = sess.get("display_name") if (sess and sess.get("display_name")) else user_name
+
+                if not active_user_name or not question:
                     self._send_json({"ok": False, "error": "User Name and Question are required."})
                     return
 
-                import sys
-                import subprocess
-                import json
-                
-                helper_path = Path(config.project_root) / "gemini_helper.py"
-                cmd = [sys.executable, str(helper_path), "-q", question]
-                if metadata and metadata != "new" and metadata != "[]" and metadata != "null":
-                    cmd.extend(["-m", metadata])
-                
-                try:
-                    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-                    if result.returncode != 0:
-                        self._send_json({"ok": False, "error": f"Helper execution failed: {result.stderr or result.stdout}"})
-                        return
-
+                conversation_id = ""
+                if metadata and metadata not in {"new", "[]", "null"}:
                     try:
-                        result_data = json.loads(result.stdout)
-                    except Exception as je:
-                        self._send_json({"ok": False, "error": f"Failed to parse helper output: {result.stdout}, err: {str(je)}"})
-                        return
-                    
-                    if not result_data.get("ok"):
-                        self._send_json({"ok": False, "error": result_data.get("error", "Unknown helper error")})
-                        return
+                        meta_arr = json.loads(metadata)
+                        if isinstance(meta_arr, list) and len(meta_arr) > 0:
+                            conversation_id = meta_arr[0]
+                    except Exception:
+                        pass
 
-                    answer = result_data["answer"]
-                    resolved_metadata = result_data["metadata"]
-                    resolved_conv_id = resolved_metadata[0] if resolved_metadata else "unknown"
-
+                if conversation_id:
                     sessions_file = Path(config.project_root) / "data" / "gemini_sessions.json"
-                    import datetime
-                    
-                    data = {"sessions": {}}
                     if sessions_file.exists():
                         try:
                             with open(sessions_file, "r", encoding="utf-8") as f:
                                 data = json.load(f)
+                            if "sessions" in data and conversation_id in data["sessions"]:
+                                session_info = data["sessions"][conversation_id]
+                                owner_id = session_info.get("user_id")
+                                owner_name = session_info.get("user_name")
+                                is_owner = (owner_id == user_id) or (not owner_id and owner_name == active_user_name)
+                                if not is_owner:
+                                    self._send_json({"ok": False, "error": "Access denied: cannot participate in a session belonging to another user."})
+                                    return
                         except Exception:
                             pass
-                    
-                    if "sessions" not in data:
-                        data["sessions"] = {}
-                        
-                    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    
-                    if resolved_conv_id not in data["sessions"]:
-                        data["sessions"][resolved_conv_id] = {
-                            "user_name": user_name,
-                            "created_at": now_str,
-                            "last_query_at": now_str,
-                            "metadata": resolved_metadata,
-                            "turns": []
-                        }
-                    else:
-                        data["sessions"][resolved_conv_id]["last_query_at"] = now_str
-                        data["sessions"][resolved_conv_id]["user_name"] = user_name
-                        data["sessions"][resolved_conv_id]["metadata"] = resolved_metadata
-                        
-                    data["sessions"][resolved_conv_id]["turns"].append({
-                        "role": "user",
-                        "content": question,
-                        "timestamp": now_str
-                    })
-                    data["sessions"][resolved_conv_id]["turns"].append({
-                        "role": "assistant",
-                        "content": answer,
-                        "timestamp": now_str
-                    })
-                    
-                    with open(sessions_file, "w", encoding="utf-8") as f:
-                        json.dump(data, f, ensure_ascii=False, indent=2)
 
-                    self._send_json({
-                        "ok": True,
-                        "answer": answer,
-                        "metadata": json.dumps(resolved_metadata)
-                    })
-                except Exception as e:
-                    self._send_json({"ok": False, "error": str(e)})
+                if task_queue_manager is None:
+                    self._send_json({"ok": False, "error": "Task queue manager is not initialized."})
+                    return
 
+                payload = {
+                    "user_name": active_user_name,
+                    "user_id": user_id,
+                    "question": question,
+                    "metadata": metadata,
+                    "model": model,
+                    "thinking": thinking
+                }
+                task_id = task_queue_manager.add_task("gemini", active_user_name, payload)
+                detail = task_queue_manager.get_task_status_detail(task_id)
+                self._send_json({
+                    "ok": True,
+                    "task_id": task_id,
+                    "status": "pending",
+                    "queue_position": detail.get("queue_position", 0),
+                    "eta_seconds": detail.get("eta_seconds", 0)
+                })
             elif parsed.path == "/api/gemini/delete":
                 content_length = int(self.headers.get("Content-Length", 0))
                 post_data = self.rfile.read(content_length).decode("utf-8")
@@ -2545,12 +4323,25 @@ def make_handler(config: AppConfig):
                     self._send_json({"ok": False, "error": "Conversation ID is required."})
                     return
 
+                sess = self._get_current_session()
+                current_user_id = sess.get("user_id") if sess else None
+                current_display_name = sess.get("display_name") if sess else None
+                current_role = sess.get("role") if sess else "user"
+
                 sessions_file = Path(config.project_root) / "data" / "gemini_sessions.json"
                 if sessions_file.exists():
                     try:
                         with open(sessions_file, "r", encoding="utf-8") as f:
                             data = json.load(f)
                         if "sessions" in data and conversation_id in data["sessions"]:
+                            session_info = data["sessions"][conversation_id]
+                            if current_role != "admin":
+                                owner_id = session_info.get("user_id")
+                                owner_name = session_info.get("user_name")
+                                is_owner = (owner_id == current_user_id) or (not owner_id and owner_name == current_display_name)
+                                if not is_owner:
+                                    self._send_json({"ok": False, "error": "Access denied: cannot delete session belonging to another user."})
+                                    return
                             del data["sessions"][conversation_id]
                             with open(sessions_file, "w", encoding="utf-8") as f:
                                 json.dump(data, f, ensure_ascii=False, indent=2)
@@ -2563,12 +4354,210 @@ def make_handler(config: AppConfig):
 
 
         def do_GET(self) -> None:
+            import json
+            global task_queue_manager
             if not self._network_allowed():
                 self._send_network_blocked()
                 return
             parsed = urlparse(self.path)
-            if parsed.path == "/":
-                self._send_html(render_index(build_status_payload(config)))
+            
+            if not self._is_authenticated():
+                if parsed.path in {"/", "/index.html", "/index-old.html", "/admin.html"}:
+                    self._send_html(LOCAL_LOGIN_PAGE_HTML)
+                    return
+                self._send_json_unauthorized()
+                return
+
+            if parsed.path == "/admin.html":
+                if not self._is_admin():
+                    self._send_html_403()
+                    return
+
+            if parsed.path.startswith("/api/admin/"):
+                if not self._is_admin():
+                    self._send_json_forbidden()
+                    return
+
+            if parsed.path == "/api/local-logout":
+                cookie_header = self.headers.get("Cookie", "")
+                import re
+                match = re.search(r'falo_local_session=([^;]+)', cookie_header)
+                if match:
+                    sid = match.group(1).strip()
+                    if sid in SESSION_DB:
+                        del SESSION_DB[sid]
+                body = json.dumps({"ok": True}).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Set-Cookie", "falo_local_session=; Path=/; Max-Age=0; HttpOnly")
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+
+            if parsed.path == "/api/local-session":
+                sess = self._get_current_session()
+                if sess:
+                    body = json.dumps({
+                        "ok": True,
+                        "session": {
+                            "user_id": sess.get("user_id"),
+                            "display_name": sess.get("display_name"),
+                            "role": sess.get("role"),
+                            "login_type": sess.get("login_type")
+                        }
+                    }, ensure_ascii=False).encode("utf-8")
+                else:
+                    body = json.dumps({"ok": False, "error": "No active session"}, ensure_ascii=False).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+
+            if parsed.path == "/api/admin/users":
+                registry = load_or_create_users(config)
+                body = json.dumps({
+                    "ok": True,
+                    "local_users": registry.get("local_users", []),
+                    "anonymous_keys": registry.get("anonymous_keys", [])
+                }, ensure_ascii=False).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+
+            elif parsed.path == "/api/admin/users/export":
+                registry = load_or_create_users(config)
+                import io
+                import openpyxl
+                wb = openpyxl.Workbook()
+                
+                # Sheet 1: 本地使用者
+                ws1 = wb.active
+                ws1.title = "本地使用者"
+                ws1.append(["帳號 (Username)", "顯示名稱 (Display Name)", "登入密碼 (Password)", "角色權限 (Role)"])
+                for u in registry.get("local_users", []):
+                    ws1.append([u.get("user_id", ""), u.get("display_name", ""), u.get("password", ""), u.get("role", "")])
+                    
+                # Sheet 2: 匿名金鑰
+                ws2 = wb.create_sheet("匿名金鑰")
+                ws2.append(["金鑰 Token (Access Key)", "用途別名 (Alias)", "啟用狀態 (Status)", "金鑰 ID (Key ID)", "建立時間", "最後使用時間"])
+                for k in registry.get("anonymous_keys", []):
+                    ws2.append([k.get("key_token", ""), k.get("alias", ""), k.get("status", ""), k.get("key_id", ""), k.get("created_at", ""), k.get("last_used_at", "")])
+                
+                stream = io.BytesIO()
+                wb.save(stream)
+                body = stream.getvalue()
+                
+                filename = f"accounts_keys_export_{time.strftime('%Y%m%d_%H%M%S')}.xlsx"
+                self.send_response(200)
+                self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                self.send_header("Content-Disposition", f"attachment; filename={filename}")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+
+            elif parsed.path == "/api/admin/audit-logs/export":
+                import io
+                import openpyxl
+                import json
+                
+                # Load notebooklm sessions
+                nlm_file = Path(config.project_root) / "data" / "multichat_sessions.json"
+                audit_logs = []
+                if nlm_file.exists():
+                    try:
+                        with open(nlm_file, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                        for cid, info in data.get("sessions", {}).items():
+                            last_q = ""
+                            if info.get("turns"):
+                                for turn in reversed(info["turns"]):
+                                    if turn.get("role") == "user":
+                                        last_q = turn.get("content", "")
+                                        break
+                            audit_logs.append({
+                                "platform": "notebooklm",
+                                "conversation_id": cid,
+                                "user_name": info.get("user_name", "Unknown"),
+                                "user_id": info.get("user_id", ""),
+                                "notebook_id": info.get("notebook_id", ""),
+                                "last_query_at": info.get("last_query_at", ""),
+                                "last_question": last_q,
+                                "remark": info.get("remark", "")
+                            })
+                    except Exception:
+                        pass
+                
+                # Load gemini sessions
+                gemini_file = Path(config.project_root) / "data" / "gemini_sessions.json"
+                if gemini_file.exists():
+                    try:
+                        with open(gemini_file, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                        for cid, info in data.get("sessions", {}).items():
+                            last_q = ""
+                            if info.get("turns"):
+                                for turn in reversed(info["turns"]):
+                                    if turn.get("role") == "user":
+                                        last_q = turn.get("content", "")
+                                        break
+                            audit_logs.append({
+                                "platform": "gemini",
+                                "conversation_id": cid,
+                                "user_name": info.get("user_name", "Unknown"),
+                                "user_id": info.get("user_id", ""),
+                                "notebook_id": "Shared Session (gemini.google.com)",
+                                "last_query_at": info.get("last_query_at", ""),
+                                "last_question": last_q,
+                                "remark": info.get("remark", "")
+                            })
+                    except Exception:
+                        pass
+                
+                # Sort by last_query_at descending
+                audit_logs.sort(key=lambda x: x["last_query_at"], reverse=True)
+                
+                wb = openpyxl.Workbook()
+                ws = wb.active
+                ws.title = "對話審計紀錄"
+                ws.append(["平台 (Platform)", "Session ID", "同仁姓名 (Display Name)", "帳號 (User ID)", "會話標記 / 備註 (Remark)", "筆記本名稱/ID (Notebook ID)", "最後提問內容 (Last Question)", "最後活動時間 (Last Query At)"])
+                for log in audit_logs:
+                    ws.append([
+                        log["platform"],
+                        log["conversation_id"],
+                        log["user_name"],
+                        log["user_id"],
+                        log["remark"],
+                        log["notebook_id"],
+                        log["last_question"],
+                        log["last_query_at"]
+                    ])
+                
+                stream = io.BytesIO()
+                wb.save(stream)
+                body = stream.getvalue()
+                
+                filename = f"audit_logs_export_{time.strftime('%Y%m%d_%H%M%S')}.xlsx"
+                self.send_response(200)
+                self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                self.send_header("Content-Disposition", f"attachment; filename={filename}")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+
+            if parsed.path in {"/", "/index.html"}:
+                self._send_file(PROJECT_ROOT / "index.html", "text/html; charset=utf-8")
+            elif parsed.path == "/index-old.html":
+                self._send_file(PROJECT_ROOT / "index-old.html", "text/html; charset=utf-8")
+            elif parsed.path == "/admin.html":
+                self._send_file(PROJECT_ROOT / "admin.html", "text/html; charset=utf-8")
             elif parsed.path == "/api/meeting-download":
                 params = parse_qs(parsed.query)
                 filename = params.get("filename", [""])[0].strip()
@@ -2590,6 +4579,77 @@ def make_handler(config: AppConfig):
                 else:
                     ctype = "application/octet-stream"
                 self._send_file(file_path, ctype)
+            elif parsed.path == "/api/gas/wan-url":
+                from gas_adapter import detect_wan_url
+                wan_url = detect_wan_url(RUNTIME_BIND_PORT)
+                self._send_json({"ok": True, "wan_url": wan_url})
+            elif parsed.path == "/api/gas/settings":
+                settings = read_gas_settings(config)
+                self._send_json({"ok": True, "settings": settings})
+            elif parsed.path == "/api/admin/selectable-notebooks":
+                projects = load_projects(config)
+                notebook_map = {}
+                for p in projects:
+                    nb_id = p.get("notebook_id")
+                    nb_title = p.get("notebook_title") or p.get("name") or "(無名稱)"
+                    if nb_id:
+                        notebook_map[nb_id] = {
+                            "id": nb_id,
+                            "title": nb_title,
+                            "created_at": p.get("notebook_created_at") or p.get("created_at") or "",
+                            "source": p.get("source") or "sync"
+                        }
+                allowed_path = config_dir(config) / "selectable_books.json"
+                allowed_ids = []
+                mode = "all"
+                if allowed_path.exists():
+                    try:
+                        allowed_data = json.loads(allowed_path.read_text(encoding="utf-8"))
+                        allowed_ids = allowed_data.get("notebook_ids", [])
+                        mode = allowed_data.get("mode", "all")
+                    except Exception:
+                        pass
+                notebooks_list = []
+                for nb_id, nb in notebook_map.items():
+                    nb["selected"] = (nb_id in allowed_ids)
+                    notebooks_list.append(nb)
+                notebooks_list.sort(key=lambda x: x["title"].lower())
+                self._send_json({"ok": True, "mode": mode, "notebooks": notebooks_list})
+            elif parsed.path == "/api/gas/history":
+                history = get_gas_url_history(config)
+                self._send_json({"ok": True, "history": history})
+            elif parsed.path == "/api/gas/history/export":
+                import openpyxl
+                from openpyxl import Workbook
+                history = get_gas_url_history(config)
+                
+                wb = Workbook()
+                ws = wb.active
+                ws.title = "GAS URL History"
+                
+                ws.append(["URL", "Alias", "Added At", "Last Used At"])
+                for item in history:
+                    ws.append([
+                        item.get("url", ""),
+                        item.get("alias", ""),
+                        item.get("added_at", ""),
+                        item.get("last_used_at", "")
+                    ])
+                
+                export_dir = Path(config.project_root) / "data" / "exports"
+                export_dir.mkdir(parents=True, exist_ok=True)
+                export_path = export_dir / "gas_url_history.xlsx"
+                wb.save(export_path)
+                
+                self.send_response(200)
+                self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                self.send_header("Content-Disposition", 'attachment; filename="gas_url_history.xlsx"')
+                self.send_header("Content-Length", str(export_path.stat().st_size))
+                self.end_headers()
+                
+                with export_path.open("rb") as f:
+                    self.wfile.write(f.read())
+                return
             elif parsed.path == "/api/status":
                 self._send_json(build_status_payload(config))
             elif parsed.path == "/api/runtime-state":
@@ -2604,7 +4664,34 @@ def make_handler(config: AppConfig):
                 project_id = params.get("project_id", [""])[0].strip()
                 self._send_html(render_adapter_preview(preview_notebooklm_adapter(config, notebook_id, project_id)))
             elif parsed.path == "/api/notebooks":
-                self._send_html(render_notebook_list(list_notebooks(config)))
+                params = parse_qs(parsed.query)
+                if params.get("format", [""])[0] == "json":
+                    res_data = list_notebooks(config)
+                    if res_data.get("ok") and isinstance(res_data.get("notebooks"), list):
+                        allowed_path = config_dir(config) / "selectable_books.json"
+                        original_count = len(res_data["notebooks"])
+                        res_data["admin_restricted"] = False
+                        if allowed_path.exists():
+                            try:
+                                allowed_data = json.loads(allowed_path.read_text(encoding="utf-8"))
+                                mode = allowed_data.get("mode", "all")
+                                allowed_ids = allowed_data.get("notebook_ids", [])
+                                
+                                if mode == "none" and original_count > 0:
+                                    res_data["notebooks"] = []
+                                    res_data["count"] = 0
+                                    res_data["admin_restricted"] = True
+                                elif mode == "custom" and isinstance(allowed_ids, list):
+                                    filtered = [nb for nb in res_data["notebooks"] if nb.get("id") in allowed_ids]
+                                    if len(filtered) < original_count:
+                                        res_data["admin_restricted"] = True
+                                    res_data["notebooks"] = filtered
+                                    res_data["count"] = len(filtered)
+                            except Exception as e:
+                                write_runtime_log(config, "filter_notebooks_error", {"error": str(e)})
+                    self._send_json(res_data)
+                else:
+                    self._send_html(render_notebook_list(list_notebooks(config)))
             elif parsed.path == "/api/projects":
                 params = parse_qs(parsed.query)
                 search = params.get("search", [""])[0]
@@ -2762,7 +4849,41 @@ def make_handler(config: AppConfig):
                 self._send_html(render_command_result("Import Disabled", {"ok": False, "mode": "import_disabled", "error": "Import is intentionally disabled in v1.01 MVP. Export-only keeps the teaching runtime safer."}))
             elif parsed.path == "/docs/refactor_notes.html":
                 self._send_file(PROJECT_ROOT / "docs" / "refactor_notes.html", "text/html; charset=utf-8")
+            elif parsed.path == "/docs/student_guide.html":
+                self._send_file(PROJECT_ROOT / "docs" / "student_guide.html", "text/html; charset=utf-8")
+            elif parsed.path == "/docs/student_guide.md":
+                self._send_file(PROJECT_ROOT / "docs" / "student_guide.md", "text/plain; charset=utf-8")
+            elif parsed.path == "/api/queue/status":
+                params = parse_qs(parsed.query)
+                task_id = params.get("task_id", [""])[0].strip()
+                if not task_id:
+                    self._send_json({"ok": False, "error": "Task ID is required."})
+                    return
+                if task_queue_manager is None:
+                    self._send_json({"ok": False, "error": "Task queue manager is not initialized."})
+                    return
+                detail = task_queue_manager.get_task_status_detail(task_id)
+                if not detail:
+                    self._send_json({"ok": False, "error": "Task not found."})
+                    return
+                self._send_json({"ok": True, **detail})
+            elif parsed.path == "/api/queue/active":
+                if task_queue_manager is None:
+                    self._send_json({"ok": False, "error": "Task queue manager is not initialized."})
+                    return
+                active_list = task_queue_manager.get_active_tasks()
+                self._send_json({"ok": True, "queue": active_list})
             elif parsed.path == "/api/multichat/sessions":
+                params = parse_qs(parsed.query)
+                is_audit = params.get("audit", [""])[0].strip() == "true"
+                
+                sess = self._get_current_session()
+                current_user_id = sess.get("user_id") if sess else None
+                current_display_name = sess.get("display_name") if sess else None
+                current_role = sess.get("role") if sess else "user"
+                
+                show_all = (current_role == "admin" and is_audit)
+
                 sessions_file = Path(config.project_root) / "data" / "multichat_sessions.json"
                 import json
                 sessions_list = []
@@ -2771,6 +4892,12 @@ def make_handler(config: AppConfig):
                         with open(sessions_file, "r", encoding="utf-8") as f:
                             data = json.load(f)
                         for cid, info in data.get("sessions", {}).items():
+                            owner_id = info.get("user_id")
+                            owner_name = info.get("user_name")
+                            if not show_all:
+                                is_owner = (owner_id == current_user_id) or (not owner_id and owner_name == current_display_name)
+                                if not is_owner:
+                                    continue
                             last_q = ""
                             if info.get("turns"):
                                 for turn in reversed(info["turns"]):
@@ -2779,11 +4906,13 @@ def make_handler(config: AppConfig):
                                         break
                             sessions_list.append({
                                 "conversation_id": cid,
-                                "user_name": info.get("user_name", "Unknown"),
+                                "user_id": owner_id,
+                                "user_name": owner_name or "Unknown",
                                 "notebook_id": info.get("notebook_id", ""),
                                 "created_at": info.get("created_at", ""),
                                 "last_query_at": info.get("last_query_at", ""),
-                                "last_question": last_q
+                                "last_question": last_q,
+                                "remark": info.get("remark", "")
                             })
                     except Exception:
                         pass
@@ -2795,6 +4924,11 @@ def make_handler(config: AppConfig):
                 if not conversation_id:
                     self._send_json({"ok": False, "error": "Conversation ID is required."})
                     return
+                sess = self._get_current_session()
+                current_user_id = sess.get("user_id") if sess else None
+                current_display_name = sess.get("display_name") if sess else None
+                current_role = sess.get("role") if sess else "user"
+
                 sessions_file = Path(config.project_root) / "data" / "multichat_sessions.json"
                 import json
                 turns = []
@@ -2803,11 +4937,29 @@ def make_handler(config: AppConfig):
                         with open(sessions_file, "r", encoding="utf-8") as f:
                             data = json.load(f)
                         if "sessions" in data and conversation_id in data["sessions"]:
-                            turns = data["sessions"][conversation_id].get("turns", [])
+                            session_info = data["sessions"][conversation_id]
+                            if current_role != "admin":
+                                owner_id = session_info.get("user_id")
+                                owner_name = session_info.get("user_name")
+                                is_owner = (owner_id == current_user_id) or (not owner_id and owner_name == current_display_name)
+                                if not is_owner:
+                                    self._send_json({"ok": False, "error": "Access denied: this session belongs to another user."})
+                                    return
+                            turns = session_info.get("turns", [])
                     except Exception:
                         pass
                 self._send_json({"ok": True, "turns": turns})
             elif parsed.path == "/api/gemini/sessions":
+                params = parse_qs(parsed.query)
+                is_audit = params.get("audit", [""])[0].strip() == "true"
+                
+                sess = self._get_current_session()
+                current_user_id = sess.get("user_id") if sess else None
+                current_display_name = sess.get("display_name") if sess else None
+                current_role = sess.get("role") if sess else "user"
+                
+                show_all = (current_role == "admin" and is_audit)
+
                 sessions_file = Path(config.project_root) / "data" / "gemini_sessions.json"
                 import json
                 sessions_list = []
@@ -2816,6 +4968,12 @@ def make_handler(config: AppConfig):
                         with open(sessions_file, "r", encoding="utf-8") as f:
                             data = json.load(f)
                         for cid, info in data.get("sessions", {}).items():
+                            owner_id = info.get("user_id")
+                            owner_name = info.get("user_name")
+                            if not show_all:
+                                is_owner = (owner_id == current_user_id) or (not owner_id and owner_name == current_display_name)
+                                if not is_owner:
+                                    continue
                             last_q = ""
                             if info.get("turns"):
                                 for turn in reversed(info["turns"]):
@@ -2824,11 +4982,13 @@ def make_handler(config: AppConfig):
                                         break
                             sessions_list.append({
                                 "conversation_id": cid,
-                                "user_name": info.get("user_name", "Unknown"),
+                                "user_id": owner_id,
+                                "user_name": owner_name or "Unknown",
                                 "created_at": info.get("created_at", ""),
                                 "last_query_at": info.get("last_query_at", ""),
                                 "last_question": last_q,
-                                "metadata": json.dumps(info.get("metadata", []))
+                                "metadata": json.dumps(info.get("metadata", [])),
+                                "remark": info.get("remark", "")
                             })
                     except Exception:
                         pass
@@ -2840,6 +5000,11 @@ def make_handler(config: AppConfig):
                 if not conversation_id:
                     self._send_json({"ok": False, "error": "Conversation ID is required."})
                     return
+                sess = self._get_current_session()
+                current_user_id = sess.get("user_id") if sess else None
+                current_display_name = sess.get("display_name") if sess else None
+                current_role = sess.get("role") if sess else "user"
+
                 sessions_file = Path(config.project_root) / "data" / "gemini_sessions.json"
                 import json
                 turns = []
@@ -2848,7 +5013,15 @@ def make_handler(config: AppConfig):
                         with open(sessions_file, "r", encoding="utf-8") as f:
                             data = json.load(f)
                         if "sessions" in data and conversation_id in data["sessions"]:
-                            turns = data["sessions"][conversation_id].get("turns", [])
+                            session_info = data["sessions"][conversation_id]
+                            if current_role != "admin":
+                                owner_id = session_info.get("user_id")
+                                owner_name = session_info.get("user_name")
+                                is_owner = (owner_id == current_user_id) or (not owner_id and owner_name == current_display_name)
+                                if not is_owner:
+                                    self._send_json({"ok": False, "error": "Access denied: this session belongs to another user."})
+                                    return
+                            turns = session_info.get("turns", [])
                     except Exception:
                         pass
                 self._send_json({"ok": True, "turns": turns})
@@ -3455,6 +5628,7 @@ def render_index(payload: Dict[str, object]) -> str:
     <a class="button" href="/api/export-state-json" onclick="remember('export_state_json')">Export State JSON</a>
     <a class="button" href="/api/export-excel" onclick="remember('export_excel')">Export Excel Report</a>
     <a class="button" href="/docs/refactor_notes.html">Open Refactor Notes</a>
+    <a class="button" href="/docs/student_guide.html">Open Student Guide</a>
     <a class="button" href="/api/status">Open JSON Status</a>
     <a class="button" href="/api/runtime-state">Open Runtime State</a>
   </section>
@@ -3630,11 +5804,11 @@ def render_index(payload: Dict[str, object]) -> str:
         <label>每次最多任務<br><input type="number" name="max_tasks_per_poll" min="1" max="50" value="{escape_html(gas_settings.get('max_tasks_per_poll', DEFAULT_GAS_MAX_TASKS_PER_POLL))}"></label>
       </div>
       <div class="formrow">
-        <label>GAS Web App URL<br><input type="text" name="web_app_url" value="{escape_html(gas_url)}" placeholder="https://script.google.com/macros/s/.../exec"></label>
+        <label>GAS Web App URL<br><input type="text" name="web_app_url" value="{escape_html(gas_url)}" placeholder="https://script.google.com/macros/s/AKfycbw9X3Y6MQ2XpvsS9BXuCZeZsVkrbT1VL0JkDkotrbs-omYG8OpuWpAl1fowiJa_QW1i/exec"></label>
       </div>
       <div class="formrow">
         <label>API Token<br><input id="gas_api_token" type="password" name="api_token" placeholder="留空代表沿用目前 token"></label>
-        <button class="button gold" type="button" onclick="document.getElementById('gas_api_token').value='CHANGE_ME_LOCAL_TOKEN'; faloAction(this, 'Filled'); return false;">Use Default Token</button>
+        <button class="button gold" type="button" onclick="document.getElementById('gas_api_token').value='123456'; faloAction(this, 'Filled'); return false;">Use Default Token</button>
         <label>下載暫存資料夾<br><input type="text" name="local_download_root" value="{escape_html(gas_download_root)}"></label>
       </div>
       <div class="formrow">
@@ -4575,12 +6749,17 @@ def quote_url(value: object) -> str:
 
 
 def run_server(port: int, open_browser: bool, host: str = "0.0.0.0") -> None:
-    global RUNTIME_BIND_HOST, RUNTIME_BIND_PORT
+    global RUNTIME_BIND_HOST, RUNTIME_BIND_PORT, task_queue_manager
     RUNTIME_BIND_HOST = host
     config = load_or_create_config(PROJECT_ROOT)
     ensure_gas_auto_worker(config)
     ensure_incoming_watch_worker(config)
     ensure_incoming_realtime_watch_worker(config)
+    
+    # Start task queue manager
+    task_queue_manager = TaskQueueManager(config)
+    task_queue_manager.start()
+    
     actual_port = find_available_port(port, host)
     RUNTIME_BIND_PORT = actual_port
     server = ThreadingHTTPServer((host, actual_port), make_handler(config))

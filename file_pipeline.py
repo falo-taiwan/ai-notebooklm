@@ -1,3 +1,4 @@
+# v2.01版 Falo x Force Cheng 2026/6/14
 """Local file pipeline helpers.
 
 The original script mixed folder scanning, Excel conversion, upload, and GUI

@@ -1,3 +1,4 @@
+# v2.01版 Falo x Force Cheng 2026/6/14
 """輪詢 Google Sheet / GAS 雲端中控，並餵進本機 queue。
 
 Falo x Force 教學註解：
@@ -38,8 +39,8 @@ from runtime_server import (
 DEFAULT_GAS_CONFIG = {
     "enabled": False,
     "auto_poll_enabled": False,
-    "web_app_url": "",
-    "api_token": "CHANGE_ME_LOCAL_TOKEN",
+    "web_app_url": "https://script.google.com/macros/s/AKfycbw9X3Y6MQ2XpvsS9BXuCZeZsVkrbT1VL0JkDkotrbs-omYG8OpuWpAl1fowiJa_QW1i/exec",
+    "api_token": "123456",
     "poll_interval_seconds": 600,
     "max_tasks_per_poll": 3,
     "auto_execute": False,
@@ -378,6 +379,78 @@ def poll_gas_once(
     event_name = "gas_cloud_wake_pull" if poll_origin == "cloud_wake" else "gas_poll_once"
     write_runtime_log(config, event_name, summary)
     return summary
+
+
+
+def detect_wan_url(port: int) -> str:
+    import urllib.request
+    import json
+    # 1. Try to detect ngrok tunnel
+    try:
+        req = urllib.request.Request("http://127.0.0.1:4040/api/tunnels")
+        with urllib.request.urlopen(req, timeout=2) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            tunnels = data.get("tunnels", [])
+            for t in tunnels:
+                pub_url = t.get("public_url", "")
+                if pub_url.startswith("https://") or pub_url.startswith("http://"):
+                    return pub_url
+    except Exception:
+        pass
+
+    # 2. Fallback to public WAN IP
+    for service_url in ["https://api.ipify.org", "https://httpbin.org/ip"]:
+        try:
+            req = urllib.request.Request(service_url)
+            with urllib.request.urlopen(req, timeout=2) as response:
+                res_data = response.read().decode('utf-8').strip()
+                if service_url.endswith("ip"):
+                    try:
+                        res_data = json.loads(res_data).get("origin", "").split(",")[0].strip()
+                    except Exception:
+                        pass
+                if res_data and len(res_data.split(".")) == 4:
+                    return f"http://{res_data}:{port}"
+        except Exception:
+            pass
+
+    return ""
+
+
+def push_host_info_to_gas(config: AppConfig, method: str = "scheduled") -> Dict[str, object]:
+    import socket
+    import platform
+    from runtime_server import detect_lan_ip, RUNTIME_BIND_PORT
+    
+    gas_settings = load_or_create_gas_config(config)
+    web_app_url = str(gas_settings.get("web_app_url") or "").strip()
+    if not web_app_url:
+        return {"ok": False, "error": "web_app_url is required"}
+    token = str(gas_settings.get("api_token") or "")
+    
+    lan_ip = detect_lan_ip()
+    port = RUNTIME_BIND_PORT
+    lan_url = f"http://{lan_ip}:{port}"
+    wan_url = detect_wan_url(port)
+    hostname = socket.gethostname()
+    
+    payload = {
+        "action": "update_host_info",
+        "token": token,
+        "lan_url": lan_url,
+        "wan_url": wan_url,
+        "hostname": hostname,
+        "os_type": platform.system(),
+        "report_method": method,
+        "poll_interval_seconds": int(gas_settings.get("poll_interval_seconds") or 300),
+        "local_time": time.strftime("%Y-%m-%d %H:%M:%S")
+    }
+    
+    try:
+        res = _post_json(web_app_url, payload, timeout=30)
+        return res
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
 
 def poll_gas_loop(config: AppConfig) -> None:

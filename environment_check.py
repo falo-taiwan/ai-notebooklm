@@ -1,3 +1,4 @@
+# v2.01版 Falo x Force Cheng 2026/6/14
 """Local environment checks for the AI NotebookLM Runtime Lab local lab."""
 
 from __future__ import annotations

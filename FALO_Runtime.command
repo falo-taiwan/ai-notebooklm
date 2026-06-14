@@ -8,10 +8,7 @@ set -e
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$PROJECT_DIR"
 
-PORT="${FALO_RUNTIME_PORT:-8765}"
 HOST="${FALO_RUNTIME_HOST:-0.0.0.0}"
-LOCAL_URL="http://127.0.0.1:${PORT}"
-SESSION_NAME="ai_etl_runtime_${PORT}"
 ENABLE_NGROK="${FALO_ENABLE_NGROK:-1}"
 
 echo "=============================================="
@@ -20,7 +17,7 @@ echo "=============================================="
 echo ""
 echo "Falo x Force 教學註解："
 echo "1. Runtime 是本機 Python service，真正負責 queue / upload / log。"
-echo "2. Portal 是 HTML 操作面板，網址是 ${LOCAL_URL}。"
+echo "2. Portal 是 HTML 操作面板。"
 echo "3. ngrok 只是外部通道，讓 GAS / 雲端可以叫醒本機，不是第二個 runtime。"
 echo ""
 
@@ -28,27 +25,28 @@ echo "[1/4] Environment check"
 ./.venv/bin/python environment_check.py
 echo ""
 
-echo "[2/4] Restart Python runtime on ${HOST}:${PORT}"
-screen -S "${SESSION_NAME}" -X quit >/dev/null 2>&1 || true
-
-PORT_PIDS="$(lsof -ti tcp:${PORT} 2>/dev/null || true)"
-if [ -n "${PORT_PIDS}" ]; then
-  echo "[INFO] Found existing listener(s) on port ${PORT}: ${PORT_PIDS}"
-  echo "[INFO] Stopping old listener(s) for clean restart."
-  echo "${PORT_PIDS}" | xargs kill >/dev/null 2>&1 || true
-  sleep 1
+echo "[2/4] Resolve port and manage conflicts"
+PORT=$(./.venv/bin/python falo_launcher.py)
+if [ -z "${PORT}" ]; then
+  echo "[ERROR] Failed to resolve port via falo_launcher.py"
+  exit 1
 fi
+LOCAL_URL="http://127.0.0.1:${PORT}"
+SESSION_NAME="ai_etl_runtime_${PORT}"
+
+# Stop any screen session associated with this resolved port
+screen -S "${SESSION_NAME}" -X quit >/dev/null 2>&1 || true
 
 screen -dmS "${SESSION_NAME}" ./.venv/bin/python runtime_server.py --host "${HOST}" --port "${PORT}" --no-open
 
 for i in {1..30}; do
-  if curl -fsS "${LOCAL_URL}/api/status" >/dev/null 2>&1; then
+  if curl -fsS "${LOCAL_URL}/" >/dev/null 2>&1; then
     break
   fi
   sleep 0.5
 done
 
-if ! curl -fsS "${LOCAL_URL}/api/status" >/dev/null 2>&1; then
+if ! curl -fsS "${LOCAL_URL}/" >/dev/null 2>&1; then
   echo "[ERROR] Runtime did not become ready: ${LOCAL_URL}"
   echo "Debug: screen -r ${SESSION_NAME}"
   exit 1

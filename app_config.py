@@ -1,3 +1,4 @@
+# v2.01版 Falo x Force Cheng 2026/6/14
 """Application configuration for AI NotebookLM Runtime Lab.
 
 This module is intentionally small: it removes hard-coded local paths and gives

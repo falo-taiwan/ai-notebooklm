@@ -34,7 +34,7 @@ def extract_google_cookies():
             secure_1psidts = cookie.get("value")
     return secure_1psid, secure_1psidts
 
-async def run_gemini(question, metadata_json=None):
+async def run_gemini(question, metadata_json=None, model_name=None, thinking_level=None):
     try:
         # Extract cookies from storage_state.json
         secure_1psid, secure_1psidts = extract_google_cookies()
@@ -52,14 +52,43 @@ async def run_gemini(question, metadata_json=None):
             except Exception:
                 pass
 
+        # Resolve model argument dynamically based on model and thinking level selection
+        model_arg = None
+        model_name = (model_name or "flash").strip().lower()
+        thinking_level = (thinking_level or "standard").strip().lower()
+
+        if model_name == "flash-lite":
+            capacity_tail = 4 if thinking_level == "extended" else 1
+            model_arg = {
+                "model_name": f"flash-lite-{thinking_level}",
+                "model_header": {
+                    "x-goog-ext-525001261-jspb": f'[1,null,null,null,"8c46e95b1a07cecc",null,null,0,[4],null,null,{capacity_tail}]',
+                    "x-goog-ext-73010989-jspb": "[0]",
+                    "x-goog-ext-73010990-jspb": "[0]"
+                }
+            }
+        elif model_name == "pro":
+            if thinking_level == "deep":
+                model_arg = "gemini-3-pro-advanced"
+            elif thinking_level == "extended":
+                model_arg = "gemini-3-pro-plus"
+            else:
+                model_arg = "gemini-3-pro"
+        else: # default to 3.5 flash
+            if thinking_level == "extended":
+                model_arg = "gemini-3-flash-plus"
+            else:
+                model_arg = "gemini-3-flash"
+
+        kwargs = {}
         if metadata and isinstance(metadata, list) and len(metadata) > 0:
-            # Continue existing chat session
-            chat_session = client.start_chat(metadata=metadata)
-            response = await chat_session.send_message(question)
-        else:
-            # Start a fresh chat session
-            chat_session = client.start_chat()
-            response = await chat_session.send_message(question)
+            kwargs["metadata"] = metadata
+        if model_arg:
+            kwargs["model"] = model_arg
+
+        # Start or continue chat session
+        chat_session = client.start_chat(**kwargs)
+        response = await chat_session.send_message(question)
 
         output = {
             "ok": True,
@@ -79,9 +108,11 @@ def main():
     parser = argparse.ArgumentParser(description="Gemini Web API Helper")
     parser.add_argument("-q", "--question", required=True, help="Question to ask Gemini")
     parser.add_argument("-m", "--metadata", default=None, help="JSON-encoded metadata array [cid, rid, rcid]")
+    parser.add_argument("--model", default=None, help="Gemini model name (flash, pro, flash-lite)")
+    parser.add_argument("--thinking", default=None, help="Gemini thinking mode (standard, extended, deep)")
     args = parser.parse_args()
 
-    result = asyncio.run(run_gemini(args.question, args.metadata))
+    result = asyncio.run(run_gemini(args.question, args.metadata, args.model, args.thinking))
     print(json.dumps(result, ensure_ascii=False))
 
 if __name__ == "__main__":

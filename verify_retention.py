@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# v2.01版 Falo x Force Cheng 2026/6/14
 import subprocess
 import json
 import sys
