@@ -258,7 +258,7 @@ class TaskQueueManager:
         if conversation_id and conversation_id != "new":
             cmd.extend(["-c", conversation_id])
 
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", check=False)
         if result.returncode != 0:
             return {"ok": False, "error": f"Helper execution failed: {result.stderr or result.stdout}"}
 
@@ -341,7 +341,7 @@ class TaskQueueManager:
         if thinking:
             cmd.extend(["--thinking", thinking])
 
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", check=False)
         if result.returncode != 0:
             return {"ok": False, "error": f"Helper execution failed: {result.stderr or result.stdout}"}
 
@@ -4361,6 +4361,10 @@ def make_handler(config: AppConfig):
                 return
             parsed = urlparse(self.path)
             
+            if parsed.path == "/api/status":
+                self._send_json(build_status_payload(config))
+                return
+
             if not self._is_authenticated():
                 if parsed.path in {"/", "/index.html", "/index-old.html", "/admin.html"}:
                     self._send_html(LOCAL_LOGIN_PAGE_HTML)

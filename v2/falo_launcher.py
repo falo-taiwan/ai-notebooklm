@@ -35,6 +35,24 @@ def get_service_pid(port):
         pass
     return None
 
+def get_any_process_on_port(port):
+    if os.name == 'nt':
+        try:
+            cmd = f'netstat -aon'
+            res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            for line in res.stdout.splitlines():
+                parts = line.strip().split()
+                if len(parts) >= 5 and f":{port}" in parts[1]:
+                    try:
+                        pid = int(parts[-1])
+                        if pid > 0:
+                            return pid
+                    except ValueError:
+                        pass
+        except Exception:
+            pass
+    return None
+
 def kill_process(pid):
     try:
         log(f"[INFO] Killing process with PID {pid}...")
@@ -70,7 +88,7 @@ def main():
     
     if check_port_in_use(DEFAULT_PORT):
         log(f"[INFO] Port {DEFAULT_PORT} is in use.")
-        pid = get_service_pid(DEFAULT_PORT)
+        pid = get_service_pid(DEFAULT_PORT) or get_any_process_on_port(DEFAULT_PORT)
         if pid:
             log(f"[OK] Detected same service running on port {DEFAULT_PORT} (PID: {pid}).")
             if kill_process(pid):

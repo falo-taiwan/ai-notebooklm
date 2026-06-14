@@ -3,6 +3,8 @@ import asyncio
 import sys
 import json
 import argparse
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
 from notebooklm import NotebookLMClient
 from notebooklm.exceptions import ChatError, NetworkError
 

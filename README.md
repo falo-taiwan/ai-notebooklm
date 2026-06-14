@@ -37,6 +37,7 @@
 *   **V2 改版架構筆記 (Refactor Notes)**: <https://falo-taiwan.github.io/ai-notebooklm/v2/docs/refactor_notes.html>
 *   **V2 GAS 雲端控制台 (GAS Portal)**: <https://falo-taiwan.github.io/ai-notebooklm/v2/gas-web.html>
 *   **V2 Windows 新環境部署指南 (Windows Guide)**: <https://falo-taiwan.github.io/ai-notebooklm/v2/docs/windows_deployment_guide.html>
+*   **V2 Windows 實戰排錯日誌 (Troubleshooting Guide)**: <https://falo-taiwan.github.io/ai-notebooklm/v2/docs/windows_deployment_issues.html>
 
 ---
 

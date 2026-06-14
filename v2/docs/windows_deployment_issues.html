@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Windows 部署挑戰與解決方案 - AI NotebookLM Runtime Lab</title>
+  <!-- Google Fonts: Inter & Noto Sans TC -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #0b0f19 0%, #111827 100%);
+      --card-bg: rgba(31, 41, 55, 0.65);
+      --card-border: rgba(75, 85, 99, 0.4);
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --success: #10b981;
+      --error: #ef4444;
+      --warning: #f59e0b;
+      --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', 'Noto Sans TC', sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      line-height: 1.6;
+      padding: 40px 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 50px;
+      position: relative;
+    }
+
+    header h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: linear-gradient(to right, #a5b4fc, #818cf8, #6366f1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 12px;
+      letter-spacing: -0.5px;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      font-weight: 300;
+    }
+
+    .badge-bar {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 15px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    .intro-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 25px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .intro-card h2 {
+      font-size: 1.3rem;
+      margin-bottom: 10px;
+      color: #818cf8;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .issues-list {
+      display: flex;
+      flex-direction: column;
+      gap: 25px;
+    }
+
+    .issue-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 30px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+      transition: transform 0.2s ease, border-color 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .issue-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--primary);
+    }
+
+    .issue-card.resolved::before {
+      background: var(--success);
+    }
+
+    .issue-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(99, 102, 241, 0.6);
+    }
+
+    .issue-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .issue-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .issue-number {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-muted);
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .status-badge {
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .status-badge.fixed {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34d399;
+    }
+
+    .section-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .section-content {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      padding: 15px 18px;
+      margin-bottom: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .section-content.solution {
+      border-left: 3px solid var(--success);
+      background: rgba(16, 185, 129, 0.03);
+    }
+
+    .code-block {
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 0.9rem;
+      color: #38bdf8;
+      background: #080c14;
+      padding: 12px 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      margin-top: 8px;
+    }
+
+    .cli-box {
+      background: #030712;
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      border-radius: 12px;
+      padding: 25px;
+      margin-top: 40px;
+    }
+
+    .cli-box h3 {
+      font-size: 1.2rem;
+      color: #a5b4fc;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .cli-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      font-size: 0.95rem;
+    }
+
+    .cli-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .step-number {
+      background: var(--primary);
+      color: white;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: bold;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 60px;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 30px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  
+  <header>
+    <h1>Windows 環境部署挑戰與排除指南</h1>
+    <p>AI NotebookLM Runtime Lab v2 本地端部署與實戰排錯日誌</p>
+    <div class="badge-bar">
+      <span class="badge">Windows 11 AMD64</span>
+      <span class="badge">Python 3.12+</span>
+      <span class="badge">Port 8765</span>
+      <span class="badge">ngrok Tunneling</span>
+    </div>
+  </header>
+
+  <section class="intro-card">
+    <h2>🎯 部署背景與任務目標</h2>
+    <p>本文件詳細記載了將 <strong>AI NotebookLM v2</strong> 整合地端伺服器移植至 Windows 電腦時所遭遇的 6 項核心挑戰與解決方案。透過對 Python 代碼、依賴庫、Port 配置與 Windows 系統機制的精確修復，我們已實現了<strong>本地伺服器、CLI 與外部 ngrok 隧道的完美對接</strong>。</p>
+  </section>
+
+  <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 18px; margin-bottom: 35px; color: var(--text-main);">
+    <h3 style="color: var(--success); font-size: 1.1rem; margin-bottom: 6px;">🎉 v2.20 版本自動修復公告</h3>
+    <p style="font-size: 0.92rem; color: var(--text-muted); line-height: 1.5;">以下記載的所有部署挑戰、程式碼修改（包含跨平台路徑防呆、免登入狀態放行、UTF-8 終端機重組、orjson 依賴補齊以及 netstat 自動殺行程衝突管理），<strong>皆已在 v2.20 版本中預設整合完成</strong>。您在新環境部署本專案時，無須再手動修改任何程式碼！</p>
+  </div>
+
+  <div class="issues-list">
+
+    <!-- Issue 1 -->
+    <div class="issue-card resolved">
+      <div class="issue-header">
+        <div class="issue-title">
+          <span class="issue-number">1</span>
+          設定檔 macOS 硬編碼路徑衝突
+        </div>
+        <span class="status-badge fixed">已修復</span>
+      </div>
+      
+      <div class="section-title">🔍 問題現象 (Symptom)</div>
+      <div class="section-content">
+        啟動環境檢查腳本 <code>environment_check.py</code> 時直接崩潰，拋出 <code>PermissionError [WinError 5] Access is denied: 'C:\Users\force'</code>。
+      </div>
+
+      <div class="section-title">💡 原因分析 (Root Cause)</div>
+      <div class="section-content">
+        原始部署包內的 <code>v2/config/config.json</code> 設定檔中，寫入了原作者在 macOS 上的絕對路徑（如 <code>/Users/force/...</code>）。Windows 執行時嘗試在不存在且無權限的 <code>C:\Users\force</code> 目錄下建立資料夾而發生崩潰。
+      </div>
+
+      <div class="section-title">✅ 解決方案 (Solution)</div>
+      <div class="section-content solution">
+        <strong>自動跨平台路徑防呆 (v2.20)</strong>：在 <code>app_config.py</code> 當中新增了跨平台路徑校正，若是在 Windows 上執行卻讀取到 Unix 格式的絕對路徑，程式會自動忽略並使用本機實體路徑重新生成乾淨的相對路徑設定檔。
+      </div>
+    </div>
+
+    <!-- Issue 2 -->
+    <div class="issue-card resolved">
+      <div class="issue-header">
+        <div class="issue-title">
+          <span class="issue-number">2</span>
+          伺服器重啟時 Port 衝突無法關閉舊行程
+        </div>
+        <span class="status-badge fixed">已修復</span>
+      </div>
+      
+      <div class="section-title">🔍 問題現象 (Symptom)</div>
+      <div class="section-content">
+        每次重啟地端伺服器時，啟動器 <code>falo_launcher.py</code> 都會判定 Port 8765 被佔用，進而無法將其關閉，被迫使用備用埠口導致設定混亂。
+      </div>
+
+      <div class="section-title">💡 原因分析 (Root Cause)</div>
+      <div class="section-content">
+        啟動器藉由 GET 請求 <code>/api/status</code> 回傳的 JSON 判定是否為本專案行程。但由於該 API 預設需要登入驗證（HTTP 401），未登入時會拋出異常中斷，導致啟動器誤判。
+      </div>
+
+      <div class="section-title">✅ 解決方案 (Solution)</div>
+      <div class="section-content solution">
+        修改 <code>v2/runtime_server.py</code> 中的 <code>do_GET</code> 方法，<strong>放行對 <code>/api/status</code> 的免驗證 GET 請求</strong>。現在啟動器能正常獲取 PID 並在重啟時自動關閉舊進程。
+      </div>
+    </div>
+
+    <!-- Issue 3 -->
+    <div class="issue-card resolved">
+      <div class="issue-header">
+        <div class="issue-title">
+          <span class="issue-number">3</span>
+          Windows 控制台字型編碼異常導致提問崩潰
+        </div>
+        <span class="status-badge fixed">已修復</span>
+      </div>
+      
+      <div class="section-title">🔍 問題現象 (Symptom)</div>
+      <div class="section-content">
+        在 Portal 前端進行 AI 對話提問時，系統彈出紅字錯誤：<br>
+        <code>UnicodeEncodeError: 'charmap' codec can't encode characters: character maps to &lt;undefined&gt;</code>。
+      </div>
+
+      <div class="section-title">💡 原因分析 (Root Cause)</div>
+      <div class="section-content">
+        <code>ask_helper.py</code> 與 <code>gemini_helper.py</code> 輸出結果時使用原生中文字元。但在 Windows 系統中，終端機預設編碼（如 cp950）無法對映中文字元，導致 <code>print</code> 拋出編碼異常而直接崩潰。
+      </div>
+
+      <div class="section-title">✅ 解決方案 (Solution)</div>
+      <div class="section-content solution">
+        1. 在 <code>ask_helper.py</code> 與 <code>gemini_helper.py</code> 開頭強制將 <code>sys.stdout</code> 的輸出流重新配置為 <code>utf-8</code>。<br>
+        2. 修改 <code>runtime_server.py</code>，在呼叫 <code>subprocess.run</code> 時明確指定 <code>encoding="utf-8"</code> 進行解碼。
+      </div>
+    </div>
+
+    <!-- Issue 4 -->
+    <div class="issue-card resolved">
+      <div class="issue-header">
+        <div class="issue-title">
+          <span class="issue-number">4</span>
+          Gemini 提問遺失 orjson 依賴庫
+        </div>
+        <span class="status-badge fixed">已修復</span>
+      </div>
+      
+      <div class="section-title">🔍 問題現象 (Symptom)</div>
+      <div class="section-content">
+        點擊「Gemini Advanced」向 Gemini 提問時，系統提示錯誤 <code>ModuleNotFoundError: No module named 'orjson'</code>。
+      </div>
+
+      <div class="section-title">💡 原因分析 (Root Cause)</div>
+      <div class="section-content">
+        <code>gemini_helper.py</code> 調用的 <code>gemini_webapi</code> 模組依賴高效能 JSON 解析庫 <code>orjson</code>，但在原始部署包提供的 <code>requirements.txt</code> 中遺漏了這個套件。
+      </div>
+
+      <div class="section-title">✅ 解決方案 (Solution)</div>
+      <div class="section-content solution">
+        已將 <strong>orjson</strong> 依賴套件正式加入 <code>v2/requirements.txt</code>。在新環境執行 <code>pip install -r requirements.txt</code> 時會一併自動安裝。
+      </div>
+    </div>
+
+    <!-- Issue 5 -->
+    <div class="issue-card resolved">
+      <div class="issue-header">
+        <div class="issue-title">
+          <span class="issue-number">5</span>
+          CLI 登入程式無聲閃退
+        </div>
+        <span class="status-badge fixed">已修復</span>
+      </div>
+      
+      <div class="section-title">🔍 問題現象 (Symptom)</div>
+      <div class="section-content">
+        執行 <code>notebooklm login --fresh</code> 以嘗試重新登入 CLI 時，程式瞬間閃退，且背景沒有任何反應。
+      </div>
+
+      <div class="section-title">💡 原因分析 (Root Cause)</div>
+      <div class="section-content">
+        在新的虛擬環境中，尚未下載 Playwright 對應的 Chromium 瀏覽器二進位實體檔。當登入程式調用 Playwright 準備彈出瀏覽器時便會直接拋出異常。
+      </div>
+
+      <div class="section-title">✅ 解決方案 (Solution)</div>
+      <div class="section-content solution">
+        在 Windows 指南中增加手動下載與安裝指令的說明：
+        <div class="code-block">.venv\Scripts\playwright install chromium</div>
+      </div>
+    </div>
+
+    <!-- Issue 6 -->
+    <div class="issue-card resolved">
+      <div class="issue-header">
+        <div class="issue-title">
+          <span class="issue-number">6</span>
+          ngrok 穿透 Port 對接錯誤 (ERR_NGROK_8012)
+        </div>
+        <span class="status-badge fixed">已修復</span>
+      </div>
+      
+      <div class="section-title">🔍 問題現象 (Symptom)</div>
+      <div class="section-content">
+        外部 GAS 點擊測試時失敗，訪問 ngrok 連結會彈出紅字錯誤 <code>ERR_NGROK_8012</code>。
+      </div>
+
+      <div class="section-title">💡 原因分析 (Root Cause)</div>
+      <div class="section-content">
+        本機已經有一個正在連通的 ngrok 隧道進程，但該隧道被配置為將外部流量轉發到本地的 <code>8888</code> Port，而我們剛剛啟動的地端 Python 伺服器卻是運行在預設的 <code>8765</code> Port。
+      </div>
+
+      <div class="section-title">✅ 解決方案 (Solution)</div>
+      <div class="section-content solution">
+        在 <code>falo_launcher.py</code> 內新增 <code>get_any_process_on_port</code> 的邏輯，如果發現 8765 埠口被任何不明行程佔用，會自動使用系統 `netstat -aon` 獲取其 PID 並調用 taskkill 將其強制釋放，確保服務埠口完全對齊。
+      </div>
+    </div>
+
+  </div>
+
+  <section class="cli-box">
+    <h3>⚡ 備份與一鍵啟動說明</h3>
+    <div class="cli-steps">
+      <div class="cli-step">
+        <span class="step-number">1</span>
+        <div><strong>一條龍啟動</strong>：本專案 v2 目錄下已為您配置好 <a href="file:///v2/FALO_Runtime.bat">FALO_Runtime.bat</a> 一鍵啟動批次檔。雙擊它會自動排解 Port 衝突、啟動地端大腦並自動以瀏覽器開啟 <code>http://127.0.0.1:8765</code>！</div>
+      </div>
+      <div class="cli-step">
+        <span class="step-number">2</span>
+        <div><strong>CLI 手動登入</strong>：若日後需要手動在 CLI 重新對 Google 進行授權，請在您的 Windows PowerShell 中手動執行這兩行以彈出登入視窗：
+          <div class="code-block">
+            cd c:\AAA-Antigravity\ai-notebooklm\v2<br>
+            ..\.venv\Scripts\notebooklm.exe login --fresh
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>© 2026 AI NotebookLM Windows Deployment Documentation. Created by Antigravity.</p>
+  </footer>
+
+</div>
+
+</body>
+</html>

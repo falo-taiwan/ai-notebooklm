@@ -5,6 +5,8 @@ import os
 import json
 import argparse
 from pathlib import Path
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
 
 # Add research/gemini-webapi/src to path
 PROJECT_ROOT = Path(__file__).parent.resolve()

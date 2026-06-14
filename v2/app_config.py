@@ -57,13 +57,33 @@ class AppConfig:
     @classmethod
     def from_dict(cls, project_root: Path, data: Dict[str, Any]) -> "AppConfig":
         default = cls.default(project_root)
+        
+        source_dir_val = data.get("source_dir")
+        temp_dir_val = data.get("temp_dir")
+        completed_dir_val = data.get("completed_dir")
+        failed_dir_val = data.get("failed_dir")
+        notebooklm_command_val = data.get("notebooklm_command")
+        
+        # Cross-platform sanity check: if on Windows but config has unix paths, discard them
+        if os.name == 'nt':
+            if source_dir_val and source_dir_val.startswith("/"):
+                source_dir_val = None
+            if temp_dir_val and temp_dir_val.startswith("/"):
+                temp_dir_val = None
+            if completed_dir_val and completed_dir_val.startswith("/"):
+                completed_dir_val = None
+            if failed_dir_val and failed_dir_val.startswith("/"):
+                failed_dir_val = None
+            if notebooklm_command_val and notebooklm_command_val.startswith("/"):
+                notebooklm_command_val = None
+
         return cls(
             project_root=project_root.resolve(),
-            source_dir=_path_value(data.get("source_dir"), default.source_dir),
-            temp_dir=_path_value(data.get("temp_dir"), default.temp_dir),
-            completed_dir=_path_value(data.get("completed_dir"), default.completed_dir),
-            failed_dir=_path_value(data.get("failed_dir"), default.failed_dir),
-            notebooklm_command=str(data.get("notebooklm_command") or default.notebooklm_command),
+            source_dir=_path_value(source_dir_val, default.source_dir),
+            temp_dir=_path_value(temp_dir_val, default.temp_dir),
+            completed_dir=_path_value(completed_dir_val, default.completed_dir),
+            failed_dir=_path_value(failed_dir_val, default.failed_dir),
+            notebooklm_command=str(notebooklm_command_val or default.notebooklm_command),
         )
 
     def to_json_dict(self) -> Dict[str, str]:
