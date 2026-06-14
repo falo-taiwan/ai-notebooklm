@@ -56,14 +56,34 @@ cd v2
 
 © 2026 FALO x TAAT x Force Cheng. All rights reserved. 教學實戰示範專案。
 
-## 💡 獨家防爬蟲突破技術 (TLS & HTTP/2 指紋偽裝)
+## 💡 專案核心特殊技術與架構對比
 
-本專案實作了特殊的反爬蟲繞過技術，以解決地端 Python 模擬瀏覽器訪問 Google NotebookLM 時，被 Cloudflare 等 WAF 阻斷的問題：
+本專案圍繞著 **`notebooklm-cli`**（底層通訊驅動）與 **`falo-force`**（上層業務與管理平台）兩大核心進行開發，實現了多項突破官方限制與商用級強化的獨家技術：
 
-*   **問題背景**：標準 Python `requests` 或 `httpx` 在進行 TLS 握手時，使用的是系統的 OpenSSL 庫，這會產生特定的 **JA3/JA4 加密指紋**，與真實瀏覽器（如使用 BoringSSL 的 Chrome）不同，因而會被 Cloudflare 識別並回傳 `403 Forbidden`。
-*   **核心技術**：引進並依賴了 **`curl_cffi`**（基於底層 C 語言 `curl-impersonate`）。它在編譯時動態連結了瀏覽器專用的 SSL 庫，能字節級模擬 Chrome 120 的 TLS ClientHello 擴展順序（包含 GREASE 機制）及 HTTP/2 SETTINGS 幀特徵，成功偽裝成真實瀏覽器。
-*   **無感熱更新設計**：本專案採用子行程（Subprocess）動態調用 `gemini_helper.py`。由於每次提問皆啟動獨立 Python 行程，因此在 Windows 虛擬環境中手動補齊 `curl_cffi` 依賴後，**地端伺服器無需重啟即可立即生效**。
-*   **詳細原理網頁**：請參閱專案根目錄的 [TLS 指紋偽裝與防爬蟲突破技術指南 (tls_bypass_guide.html)](file:///Users/force/Google_Antigravity/AI_NotebookLM/tls_bypass_guide.html)。
+### 1. 底層通訊與指紋偽裝：`notebooklm-cli` (notebooklm-py)
+*   **WAF 繞過**：標準 Python `requests` 在進行 TLS 握手時會產生 OpenSSL 特徵的 **JA3/JA4 加密指紋**，易被 WAF 識別並回傳 `403 Forbidden`。本專案底層連結了 **`curl_cffi`**（基於 `curl-impersonate` 與 BoringSSL），能字節級模擬 Chrome 120 的 TLS ClientHello 擴展順序（含 GREASE 機制）及 HTTP/2 SETTINGS 幀特徵，成功偽裝成真實瀏覽器。
+*   **RPC 協議逆向**：在沒有官方 API Key 的情況下，底層逆向封裝了 Google 前端網頁的 Protobuf/JSON RPC 格式，實現自動化建置書庫、對話與文件上傳。
+
+### 2. 上層增強與業務管理平台：`falo-force` (Runtime Server & Portal)
+*   **跨書庫交叉對話 (Context Injector)**：突破 Google 官方一個對話 ID 只能鎖定單一書庫的限制。`falo-force` 在發問前主動重組歷史問答紀錄並手動注入到底層快取中，讓對話在切換書庫時仍能延續上下文。
+*   **零停機熱更新子行程 (Subprocess Isolation)**：核心 API 操作均交由獨立子行程動態運行，隔離記憶體洩漏與 Asyncio 衝突；更新虛擬環境依賴（如 `curl_cffi`）時，**地端主伺服器完全無需重啟**，下次提問即刻生效。
+*   **雲地一體化任務佇列 (Hybrid Queue)**：以 Google Apps Script (GAS) 作為雲端緩衝 Sheet，地端伺服器 FIFO 佇列拉取並限流處理，內建指數退避重試，保證高併發或網絡不穩時任務不丟失。
+*   **輪次級精密資安審計與 Log CMS**：記錄每一次發問當下所用的同仁 IP、時間、書庫 ID 與書庫名稱。管理員可透過 Log CMS 後台進行全局檢索、歷史比對並導出 Excel 報表。
+*   **啟動埠衝突協商與動態 Ngrok 綁定**：啟動時自動掃描並清理舊專案進程，並在啟用 Ngrok 時自動捕捉隨機公網 URL 覆寫前端配置，實現 Plug & Play。
+
+### 📊 架構能力對比表
+
+| 特色維度 | `notebooklm-cli` (底層通訊) | `falo-force` (業務與管理平台) |
+| :--- | :--- | :--- |
+| **主要定位** | Google API 通訊與網絡層指紋模擬器 | 多同仁協作、資安稽核與功能拓展網關 |
+| **核心挑戰** | 繞過 Cloudflare 阻斷、模擬 Google 專屬協定 | 突破單一對話鎖定書庫限制、雲地派工整合 |
+| **執行方式** | 作為 Python 依賴庫被調用 | 獨立地端常駐 Web 伺服器 + 腳本自動化 |
+| **資料儲存** | Google 帳密 Cookie 持久化 | Turn-level 歷史紀錄 (`multichat_sessions.json`) |
+| **安全控制** | 僅處理 API 常規授權 | 多同仁對話隱私隔離、管理員全局審計 |
+
+---
+
+*   **詳細原理與互動模擬網頁**：請參閱專案根目錄的 [TLS 指紋偽裝與防爬蟲突破技術指南 (tls_bypass_guide.html)](file:///Users/force/Google_Antigravity/AI_NotebookLM/tls_bypass_guide.html)。
 
 ---
 
