@@ -460,7 +460,10 @@ function json_(payload) {
 
 function renderPortal_() {
   const settings = getSettings_();
-  const portalUrl = settings.portal_url || 'https://falo-taiwan.github.io/ai-notebooklm/v2/gas-web.html';
+  let portalUrl = settings.portal_url || 'https://falo-taiwan.github.io/ai-notebooklm/v2/gas-web.html';
+  if (!portalUrl || portalUrl.indexOf('google.com.tw') !== -1) {
+    portalUrl = 'https://falo-taiwan.github.io/ai-notebooklm/v2/gas-web.html';
+  }
   const safeLanUrl = String(settings.runtime_reported_lan_url || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
   const safeHostname = String(settings.runtime_hostname || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
   const safeOsType = String(settings.runtime_os_type || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
