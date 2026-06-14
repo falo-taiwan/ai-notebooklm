@@ -378,6 +378,62 @@
         </div>
       </div>
     </div>
+
+    <!-- Section 4: Architecture Comparison -->
+    <div class="card" style="max-width: 960px; width: 100%; margin: 40px auto 0; background: var(--glass-bg); border: 1px solid var(--border-color); border-radius: 24px; padding: 40px; backdrop-filter: blur(16px); text-align: left;">
+      <h2 style="font-family: var(--font-outfit); font-size: 1.75rem; font-weight: 700; color: #fff; margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+        <!-- Layers SVG -->
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+        雙層架構設計：notebooklm-cli 與 falo-force 的協同黑魔法
+      </h2>
+      <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.6; margin-bottom: 25px;">
+        在本專案的架構中，核心技術被拆分為負責底層對話與安全規避的 <strong>notebooklm-cli (notebooklm-py)</strong>，以及負責上層協作、限制突破與安全審計的 <strong>falo-force (Runtime Server & Portal)</strong> 平台。兩者分工如下：
+      </p>
+
+      <div style="overflow-x: auto; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.02);">
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+          <thead>
+            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.04);">
+              <th style="padding: 12px 16px; color: #34d399; font-weight: 600; font-family: var(--font-outfit); width: 20%;">維度</th>
+              <th style="padding: 12px 16px; color: #a78bfa; font-weight: 600; font-family: var(--font-outfit); width: 40%;">notebooklm-cli (底層驅動引擎)</th>
+              <th style="padding: 12px 16px; color: #60a5fa; font-weight: 600; font-family: var(--font-outfit); width: 40%;">falo-force (上層管理平台)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+              <td style="padding: 12px 16px; font-weight: 600; color: #fff;">核心定位</td>
+              <td style="padding: 12px 16px; color: var(--text-muted);">Google Web API 協議解析與 TLS/HTTP2 偽裝</td>
+              <td style="padding: 12px 16px; color: var(--text-muted);">多同仁安全協作、資料治理稽核與商用強化網關</td>
+            </tr>
+            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+              <td style="padding: 12px 16px; font-weight: 600; color: #fff;">解決痛點</td>
+              <td style="padding: 12px 16px; color: var(--text-muted);">解決 Cloudflare WAF 阻斷、無 API Key 對話通信</td>
+              <td style="padding: 12px 16px; color: var(--text-muted);">突破官方單一對話鎖定書庫限制、GAS 雲地派工整合</td>
+            </tr>
+            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+              <td style="padding: 12px 16px; font-weight: 600; color: #fff;">突破技巧</td>
+              <td style="padding: 12px 16px; color: var(--text-muted);">利用 BoringSSL 覆寫 TLS/JA3，字節級重排 HTTP/2 SETTINGS 幀</td>
+              <td style="padding: 12px 16px; color: var(--text-muted);">動態重組對話歷史並<strong>手動注入 (Populate) 客戶端快取</strong>，在同一 Session 內切換書庫對話</td>
+            </tr>
+            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+              <td style="padding: 12px 16px; font-weight: 600; color: #fff;">執行機制</td>
+              <td style="padding: 12px 16px; color: var(--text-muted);">作為獨立 Python 依賴模組，以 cli 工具形式運作</td>
+              <td style="padding: 12px 16px; color: var(--text-muted);">常駐後台 Web 伺服器，採用 <strong>Decoupled Subprocess (獨立子行程)</strong> 機制動態調用</td>
+            </tr>
+            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+              <td style="padding: 12px 16px; font-weight: 600; color: #fff;">資料治理</td>
+              <td style="padding: 12px 16px; color: var(--text-muted);">持久化管理 Google 登入 Cookie 與 Session 快取</td>
+              <td style="padding: 12px 16px; color: var(--text-muted);">精密記錄每一發問輪次 (Turn-level) 的同仁 IP、時間、提問書庫名與內容，提供 Log CMS & Excel 導出</td>
+            </tr>
+            <tr>
+              <td style="padding: 12px 16px; font-weight: 600; color: #fff;">部署加值</td>
+              <td style="padding: 12px 16px; color: var(--text-muted);">提供 CLI 指令完成最強帳號登入授權</td>
+              <td style="padding: 12px 16px; color: var(--text-muted);">啟動時自動進行 Port 佔用偵測、自動關閉舊進程，並動態同步 Ngrok 隨機隧道網址至前端配置</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </main>
 
   <footer>

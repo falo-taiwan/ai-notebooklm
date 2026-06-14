@@ -484,42 +484,6 @@
                 opacity: 0;
             }
         }
-
-        /* Comparison Table Styling */
-        .comparison-table-wrapper {
-            margin-top: 1.5rem;
-            overflow-x: auto;
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            background: rgba(255, 255, 255, 0.02);
-        }
-
-        .comp-table {
-            width: 100%;
-            border-collapse: collapse;
-            text-align: left;
-            font-size: 0.95rem;
-        }
-
-        .comp-table th, .comp-table td {
-            padding: 1rem 1.25rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        .comp-table th {
-            background: rgba(255, 255, 255, 0.04);
-            font-family: 'Space Grotesk', sans-serif;
-            color: var(--color-secondary);
-            font-weight: 600;
-        }
-
-        .comp-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .comp-table tr:hover td {
-            background: rgba(255, 255, 255, 0.02);
-        }
     </style>
 </head>
 <body>
@@ -755,63 +719,6 @@ print(response.status_code) <span class="highlight-yellow"># 返回 200 OK，成
                 </div>
             </div>
 
-        </section>
-
-        <!-- Section 4: Architecture Comparison -->
-        <section class="card" style="margin-bottom: 4rem;">
-            <div class="card-title text-glow-purple">
-                <!-- Layers/Git Branch Icon SVG -->
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-                雙層架構設計：notebooklm-cli 與 falo-force 的協同黑魔法
-            </div>
-            
-            <p style="margin-bottom: 1.5rem; color: var(--text-muted);">
-                在本專案的架構中，核心技術被拆分為負責底層對話與安全規避的 <strong>notebooklm-cli (notebooklm-py)</strong>，以及負責上層協作、限制突破與安全審計的 <strong>falo-force (Runtime Server & Portal)</strong> 平台。兩者分工如下：
-            </p>
-
-            <div class="comparison-table-wrapper">
-                <table class="comp-table">
-                    <thead>
-                        <tr>
-                            <th>維度</th>
-                            <th>notebooklm-cli (底層驅動引擎)</th>
-                            <th>falo-force (上層管理平台)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><strong>核心定位</strong></td>
-                            <td>Google Web API 協議解析與 TLS/HTTP2 偽裝</td>
-                            <td>多同仁安全協作、資料治理稽核與商用強化網關</td>
-                        </tr>
-                        <tr>
-                            <td><strong>解決痛點</strong></td>
-                            <td>解決 Cloudflare WAF 阻斷、無 API Key 對話通信</td>
-                            <td>突破官方單一對話鎖定書庫限制、GAS 雲地派工整合</td>
-                        </tr>
-                        <tr>
-                            <td><strong>突破技巧</strong></td>
-                            <td>利用 BoringSSL 覆寫 TLS/JA3，字節級重排 HTTP/2 SETTINGS 幀</td>
-                            <td>動態重組對話歷史並<strong>手動注入 (Populate) 客戶端快取</strong>，在同一 Session 內切換書庫對話</td>
-                        </tr>
-                        <tr>
-                            <td><strong>執行機制</strong></td>
-                            <td>作為獨立 Python 依賴模組，以 cli 工具形式運作</td>
-                            <td>常駐後台 Web 伺服器，採用 <strong>Decoupled Subprocess (獨立子行程)</strong> 機制動態調用</td>
-                        </tr>
-                        <tr>
-                            <td><strong>資料治理</strong></td>
-                            <td>持久化管理 Google 登入 Cookie 與 Session 快取</td>
-                            <td>精密記錄每一發問輪次 (Turn-level) 的同仁 IP、時間、提問書庫名與內容，提供 Log CMS & Excel 導出</td>
-                        </tr>
-                        <tr>
-                            <td><strong>部署加值</strong></td>
-                            <td>提供 CLI 指令完成最強帳號登入授權</td>
-                            <td>啟動時自動進行 Port 佔用偵測、自動關閉舊進程，並動態同步 Ngrok 隨機隧道網址至前端配置</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
         </section>
 
         <!-- Footer -->
