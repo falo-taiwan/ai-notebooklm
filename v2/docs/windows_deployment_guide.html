@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI NotebookLM Runtime Lab - Windows 新環境部署與 AI 接力指南</title>
+  <style>
+    :root {
+      --ink: #22252a;
+      --muted: #657286;
+      --green: #1d725f;
+      --blue: #315f86;
+      --line: #d9e3df;
+      --bg: #f7f8f6;
+      --card: #fff;
+      --amber: #a46b00;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.7;
+    }
+    main {
+      max-width: 960px;
+      margin: auto;
+      padding: 38px 22px 56px;
+    }
+    h1 {
+      font-size: 38px;
+      line-height: 1.15;
+      margin: 0 0 10px;
+      color: #165343;
+    }
+    h2 {
+      font-size: 26px;
+      color: #165343;
+      margin: 34px 0 12px;
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 6px;
+    }
+    h3 {
+      margin: 22px 0 8px;
+      color: var(--blue);
+    }
+    .lead {
+      font-size: 18px;
+      color: var(--muted);
+      margin: 0 0 30px;
+      line-height: 1.5;
+    }
+    .card-el {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 24px;
+      margin: 24px 0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+    }
+    code {
+      background: #eef4f1;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.9em;
+      color: #b91c1c;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+      color: inherit;
+    }
+    pre {
+      background: #eef4f1;
+      border-radius: 8px;
+      padding: 16px;
+      overflow: auto;
+      border-left: 5px solid var(--green);
+    }
+    ul, ol {
+      padding-left: 24px;
+    }
+    li {
+      margin-bottom: 8px;
+    }
+    .alert-note {
+      background-color: rgba(46, 164, 79, 0.05);
+      border-left: 4px solid var(--green);
+      border-radius: 6px;
+      padding: 14px;
+      margin: 16px 0;
+      font-size: 0.92rem;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 50px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>💻 AI NotebookLM v2 Windows 新環境部署與 AI 接力指南</h1>
+    <p class="lead">本手冊引導您如何將專案移轉至 Windows 系統進行部署，並指引新環境的 AI 助理（Antigravity）如何自動化接力。</p>
+
+    <section class="card-el">
+      <h2>📂 1. Windows 本機環境準備</h2>
+      <p>請確認您的 Windows 主機已安裝並設定妥當以下開發者工具：</p>
+      <ol>
+        <li><strong>Python 3.10+</strong>：安裝時請務必勾選 <code>Add Python.exe to PATH</code>。</li>
+        <li><strong>Node.js (LTS 版本)</strong>：用於執行 <code>clasp</code> 與 Google Apps Script (GAS) 進行同步。</li>
+        <li><strong>Git</strong>：用於版本控制與下載最新的專案。</li>
+      </ol>
+    </section>
+
+    <section class="card-el">
+      <h2>🛠️ 2. 專案解壓縮與目錄定位</h2>
+      <ol>
+        <li>將最新的專案壓縮檔 <code>AI_NotebookLM_v2.20_gas_portal_redirect_fix.zip</code> 解壓縮至您的 Windows 工作目錄（例如：<code>D:\Workspace\AI_NotebookLM</code>）。</li>
+        <li>使用 VS Code 開啟該資料夾，並開啟終端機（Terminal）。</li>
+      </ol>
+    </section>
+
+    <section class="card-el">
+      <h2>📦 3. 安裝 Python 依賴套件</h2>
+      <p>在終端機中，切換至 <code>v2</code> 目錄並執行：</p>
+      <pre><code>cd v2
+pip install -r requirements.txt</code></pre>
+      <div class="alert-note">
+        💡 <strong>註記：</strong>這會自動安裝 Flask、requests、openpyxl、google-genai 等執行本地伺服器所需的 Python 依賴。
+      </div>
+    </section>
+
+    <section class="card-el">
+      <h2>🚀 4. 啟動 Windows 地端服務</h2>
+      <p>在 Windows 檔案總管中，直接雙擊執行：</p>
+      <p style="font-size: 1.1em; font-weight: bold; color: var(--green);">👉 <code>v2/FALO_Runtime.bat</code></p>
+      <p>此批次檔會自動進行環境檢測，並在背景以 Port <code>8765</code> 啟動地端 Python 伺服器，隨後會自動為您開啟瀏覽器載入主控制網頁（<code>index.html</code>）。</p>
+    </section>
+
+    <section class="card-el">
+      <h2>🤖 5. 致新環境 AI 助理 (Antigravity) 的接力指令</h2>
+      <p>當您在 Windows 上啟動 Antigravity 時，請直接複製以下這段內容發送給它，它將會自動讀取核心檔案、檢測本地狀態並自動就緒：</p>
+      <pre><code>&lt;USER_REQUEST&gt;
+我們現在轉移到了 Windows 環境，這是一個 AI NotebookLM v2 專案。
+請你：
+1. 閱讀本地的 [windows_deployment_guide.md](file:///v2/docs/windows_deployment_guide.md) 理解 Windows 部署架構。
+2. 閱讀 [student_guide.md](file:///v2/docs/student_guide.md) 與 [refactor_notes.md](file:///v2/docs/refactor_notes.md) 掌握核心業務邏輯。
+3. 執行 v2/environment_check.py 驗證本地環境是否正常，並列出地端伺服器（runtime_server.py）的現行狀態。
+4. 如果需要重新與 Google Apps Script (GAS) 對接，請教我如何使用 clasp 指令登入並推送。
+&lt;/USER_REQUEST&gt;</code></pre>
+    </section>
+
+    <section class="card-el">
+      <h2>☁️ 6. 雲端 GAS 重新對接說明 (適用於開發者與 AI)</h2>
+      <p>若在新 Windows 上需要更新雲端 GAS：</p>
+      <ol>
+        <li><strong>登入 clasp：</strong><code>clasp login</code></li>
+        <li><strong>推送程式碼：</strong><code>clasp push</code></li>
+        <li><strong>重新發行 Web App 部署：</strong><code>clasp deploy -i AKfycbw9X3Y6MQ2XpvsS9BXuCZeZsVkrbT1VL0JkDkotrbs-omYG8OpuWpAl1fowiJa_QW1i -d "v2.01版 Windows Deploy"</code></li>
+      </ol>
+    </section>
+
+    <div class="footer">
+      <p>© 2026 FALO x TAAT x Force Cheng. Windows 環境部署維護指南。</p>
+    </div>
+  </main>
+</body>
+</html>
