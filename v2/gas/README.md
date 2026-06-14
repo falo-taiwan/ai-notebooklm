@@ -221,3 +221,7 @@ GAS Web App 內建 `Cloud Logs / Closed Loop`：
 - Drive file 由 GAS 轉成 base64 回給本機 worker。
 - 本機仍然是唯一真正執行 NotebookLM CLI 的 runtime。
 - 這版先重視可教、可測、可追蹤，不先做完整登入 session。
+
+
+---
+© 2026 Falo x Force Cheng 2026/6/15. All rights reserved.

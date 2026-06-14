@@ -95,3 +95,7 @@ pip install -r requirements.txt
 ---
 
 © 2026 FALO x TAAT x Force Cheng. Windows 環境部署維護指南。
+
+
+---
+© 2026 Falo x Force Cheng 2026/6/15. All rights reserved.

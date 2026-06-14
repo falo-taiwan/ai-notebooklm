@@ -88,3 +88,7 @@
    - 優化 Evidence 資料夾的目錄結構，改依同仁身分階層存檔。
 3. **第三階段：GAS 雲端多用戶派工優化 (待開發)**
    - 擴展 `Code.gs` 與 `gas_adapter.py`，支援在 Google 試算表上記錄多個同仁遞交的任務，並將處理好的 Word/HTML 會議記錄下載連結直接回寫至 Google 試算表中。
+
+
+---
+© 2026 Falo x Force Cheng 2026/6/15. All rights reserved.

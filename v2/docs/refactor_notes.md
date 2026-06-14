@@ -117,3 +117,7 @@ NotebookLM 專案管理 MVP：
 2. 再把 ETL 放在進階 tab，保持 UI 單純。
 3. Command Queue 先本機運作，之後接 API / GAS / 遠端主機。
 4. Logs / Governance 持續保留，避免系統變成黑盒。
+
+
+---
+© 2026 Falo x Force Cheng 2026/6/15. All rights reserved.

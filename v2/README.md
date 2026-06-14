@@ -52,3 +52,7 @@ python3 runtime_server.py
 - `v2/docs/refactor_notes.md`：架構與改版筆記。
 - `v2/docs/refactor_notes.html`：人看的 HTML 版筆記。
 - `v2/examples/sample_command_package_upload_folder.json`：去識別化指令包範例。
+
+
+---
+© 2026 Falo x Force Cheng 2026/6/15. All rights reserved.

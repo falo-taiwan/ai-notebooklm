@@ -89,3 +89,7 @@ graph TD
 3.  **跨書庫交叉對話 (v3.01+)**：
     *   **打破官方限制**：Google NotebookLM 官方對話是終身鎖定單一筆記本的。地端系統支援在「同一個對話中隨時切換下拉選單」向不同書庫提問，提供極佳的**交叉比對、綜合查詢與對照運用**的靈活性。
     *   **精密治理**：後端在 `multichat_sessions.json` 資料庫中以 `turns` 陣列內部精確地在每一輪問答節點上記錄當時發問的 `notebook_id` 和 `notebook_title`，完美平衡了「使用者操作彈性」與「管理稽核審計需求」。
+
+
+---
+© 2026 Falo x Force Cheng 2026/6/15. All rights reserved.

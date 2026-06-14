@@ -39,3 +39,7 @@
 ---
 
 © 2026 AI NotebookLM Windows Deployment Documentation.
+
+
+---
+© 2026 Falo x Force Cheng 2026/6/15. All rights reserved.

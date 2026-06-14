@@ -144,3 +144,7 @@ scheduledIncomingFolderScan()
 紅字教學提醒：未完成前不要刪除雲端 incoming 檔案。系統用 Google Drive `file_id` 防重複，但本機 worker 仍需要原始檔案才能下載與上傳；若 task 還在 `queued` / `queued_local` / `processing` 就刪除，會造成後續處理失敗。`completed` 後再手動搬移或刪除較安全。
 
 若設定了 `scanner_window_start` / `scanner_window_end`，trigger 在時間窗外只會留下 skipped log。
+
+
+---
+© 2026 Falo x Force Cheng 2026/6/15. All rights reserved.

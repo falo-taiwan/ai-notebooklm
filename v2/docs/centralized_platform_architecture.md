@@ -85,3 +85,7 @@ sequenceDiagram
 1. **極度推薦改建為中控平台**：這樣做可以徹底擺脫 Agent 框架的超高 Token 負擔，實現 **$0 運算成本** 的無限次查詢。
 2. **多用戶安全性**：伺服器統一管理「最強帳號」的 Cookie，使用者（同仁）觸碰不到帳號密碼與 Cookie，只會看到乾淨的介面，保障帳號安全。
 3. **擴充潛力**：中控平台除了提供 HTML 網頁外，還可以直接提供 API 給 Google Apps Script (GAS)，讓同仁在 Google 試算表內一鍵點擊便完成上傳與分析。
+
+
+---
+© 2026 Falo x Force Cheng 2026/6/15. All rights reserved.

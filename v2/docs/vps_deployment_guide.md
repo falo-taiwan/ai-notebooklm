@@ -145,3 +145,7 @@ function askNotebookLM() {
 ```
 > [!TIP]
 > **長期部署建議**：`trycloudflare.com` 是臨時通道，重啟後網址會變。若要長期穩定使用，可以在 Cloudflare 註冊一個免費的網域（或將您現有的網域託管在 Cloudflare），並建立一個 Persistent Tunnel，這樣就能獲得永久不變的 HTTPS 網址（例如 `https://notebooklm.yourdomain.com`）。
+
+
+---
+© 2026 Falo x Force Cheng 2026/6/15. All rights reserved.

@@ -71,3 +71,7 @@ sequenceDiagram
 | :--- | :--- | :--- |
 | **短期概念驗證 (POC)**<br/>或發問量極小 | **方案 A (純 GAS)** | 如果您能接受「每隔一段時間手動更新一次儲存在 GAS 裡的 Cookie」，且僅需做一問一答（不需多輪對話記憶），可直接在 GAS 用 `UrlFetchApp` 呼叫。 |
 | **正式生產/同仁共用**<br/>或自動化排程 | **方案 B (混合網關)** | **強烈推薦**。地端 Python 負責處理所有「難搞的 Google 驗證與歷史快取」，GAS 僅負責接收結果，體驗最穩定。 |
+
+
+---
+© 2026 Falo x Force Cheng 2026/6/15. All rights reserved.
