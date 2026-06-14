@@ -1401,6 +1401,7 @@
               platform: 'notebooklm',
               user_name: s.user_name,
               notebook_id: s.notebook_id,
+              notebook_title: s.notebook_title || "",
               conversation_id: s.conversation_id,
               last_query_at: s.last_query_at,
               last_question: s.last_question,
@@ -1454,6 +1455,7 @@
           <td style="font-weight:600;">${escapeHTML(log.user_name)}</td>
           <td style="font-size:0.8rem;">
             ${log.remark ? `<span style="color: hsl(282, 80%, 75%); font-weight:600;">📝 ${escapeHTML(log.remark)}</span>` : `<span style="color:var(--text-muted); font-size:0.75rem;">(無備註)</span>`}
+            ${log.notebook_title ? `<div style="font-weight:600; color:var(--text-main); margin-top:3px; font-size:0.78rem;">📚 ${escapeHTML(log.notebook_title)}</div>` : ''}
             <div style="font-size: 0.72rem; color: var(--text-muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px;" title="${escapeHTML(log.notebook_id)}">
               ${escapeHTML(log.notebook_id)}
             </div>
@@ -1524,7 +1526,12 @@
                 </strong>
                 <span style="color:var(--text-muted);">${turn.timestamp}</span>
               </div>
-              <div style="font-size:0.9rem; line-height:1.6; white-space:pre-wrap; word-break:break-word;">${escapeHTML(turn.content)}</div>
+              ${isUser && turn.notebook_title ? `
+                <div style="font-size:0.72rem; color:var(--accent-nlm); background:hsla(172, 85%, 45%, 0.08); padding:4px 8px; border-radius:6px; width:fit-content; margin-top:2px;">
+                  📚 書庫: ${escapeHTML(turn.notebook_title)} (${escapeHTML(turn.notebook_id)})
+                </div>
+              ` : ''}
+              <div style="font-size:0.9rem; line-height:1.6; white-space:pre-wrap; word-break:break-word; margin-top:4px;">${escapeHTML(turn.content)}</div>
             `;
             body.appendChild(card);
           });

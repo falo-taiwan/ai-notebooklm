@@ -25,6 +25,7 @@
 - ETL Upload：Excel 轉 CSV、normalize、再上傳。
 - Project Manager：專案搜尋、排序、分頁、選取與新增。
 - Logs / Governance：操作 log、錯誤 log、runtime 狀態與匯出。
+- Multi-Chat 跨書庫交叉對話：打破官方一個對話 ID 只能鎖定單一筆記本的限制，地端 Portal 支援在同一個對話中隨時切換書庫，以實現多專案知識的交叉比對、綜合查詢與交叉驗證。並以 Turn-level 精準稽核發問紀錄。
 - Command Queue：用 JSON 指令包模擬多人派工與自動執行。
 
 ## 本機啟動

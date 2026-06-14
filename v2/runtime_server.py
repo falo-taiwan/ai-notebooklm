@@ -248,6 +248,7 @@ class TaskQueueManager:
 
     def _run_notebooklm(self, payload: dict) -> dict:
         notebook_id = payload["notebook_id"]
+        notebook_title = payload.get("notebook_title", "") or f"ID: {notebook_id[:8]}"
         user_name = payload["user_name"]
         user_id = payload.get("user_id", "")
         conversation_id = payload["conversation_id"]
@@ -294,6 +295,7 @@ class TaskQueueManager:
                     "user_id": user_id,
                     "user_name": user_name,
                     "notebook_id": notebook_id,
+                    "notebook_title": notebook_title,
                     "created_at": now_str,
                     "last_query_at": now_str,
                     "turns": []
@@ -302,11 +304,15 @@ class TaskQueueManager:
                 data["sessions"][resolved_conv_id]["last_query_at"] = now_str
                 data["sessions"][resolved_conv_id]["user_name"] = user_name
                 data["sessions"][resolved_conv_id]["user_id"] = user_id
+                data["sessions"][resolved_conv_id]["notebook_id"] = notebook_id
+                data["sessions"][resolved_conv_id]["notebook_title"] = notebook_title
                 
             data["sessions"][resolved_conv_id]["turns"].append({
                 "role": "user",
                 "content": question,
-                "timestamp": now_str
+                "timestamp": now_str,
+                "notebook_id": notebook_id,
+                "notebook_title": notebook_title
             })
             data["sessions"][resolved_conv_id]["turns"].append({
                 "role": "assistant",
@@ -3301,6 +3307,8 @@ def make_handler(config: AppConfig):
                 self._send_network_blocked()
                 return
             parsed = urlparse(self.path)
+            if parsed.path.startswith("/v2/"):
+                parsed = parsed._replace(path=parsed.path[3:])
             
             if parsed.path == "/api/local-login":
                 try:
@@ -3995,6 +4003,7 @@ def make_handler(config: AppConfig):
                 from urllib.parse import parse_qs
                 params = parse_qs(post_data)
                 notebook_id = params.get("notebook_id", [""])[0].strip()
+                notebook_title = params.get("notebook_title", [""])[0].strip()
                 user_name = params.get("user_name", [""])[0].strip()
                 conversation_id = params.get("conversation_id", [""])[0].strip()
                 question = params.get("question", [""])[0].strip()
@@ -4002,6 +4011,18 @@ def make_handler(config: AppConfig):
                 sess = self._get_current_session()
                 user_id = sess.get("user_id") if sess else "unknown_user"
                 active_user_name = sess.get("display_name") if (sess and sess.get("display_name")) else user_name
+
+                if not notebook_title:
+                    try:
+                        projects = load_projects(config)
+                        for p in projects:
+                            if p.get("notebook_id") == notebook_id:
+                                notebook_title = p.get("notebook_title") or p.get("name") or ""
+                                break
+                    except Exception:
+                        pass
+                if not notebook_title:
+                    notebook_title = f"ID: {notebook_id[:8]}"
 
                 if not notebook_id or not active_user_name or not question:
                     self._send_json({"ok": False, "error": "Notebook ID, User Name, and Question are required."})
@@ -4030,11 +4051,19 @@ def make_handler(config: AppConfig):
 
                 payload = {
                     "notebook_id": notebook_id,
+                    "notebook_title": notebook_title,
                     "user_name": active_user_name,
                     "user_id": user_id,
                     "conversation_id": conversation_id,
                     "question": question
                 }
+                write_runtime_log(config, "multichat_ask", {
+                    "user_name": active_user_name,
+                    "user_id": user_id,
+                    "notebook_id": notebook_id,
+                    "notebook_title": notebook_title,
+                    "question_summary": question[:50]
+                })
                 task_id = task_queue_manager.add_task("notebooklm", active_user_name, payload)
                 detail = task_queue_manager.get_task_status_detail(task_id)
                 self._send_json({
@@ -4360,6 +4389,8 @@ def make_handler(config: AppConfig):
                 self._send_network_blocked()
                 return
             parsed = urlparse(self.path)
+            if parsed.path.startswith("/v2/"):
+                parsed = parsed._replace(path=parsed.path[3:])
             
             if parsed.path == "/api/status":
                 self._send_json(build_status_payload(config))
@@ -4490,7 +4521,7 @@ def make_handler(config: AppConfig):
                                 "conversation_id": cid,
                                 "user_name": info.get("user_name", "Unknown"),
                                 "user_id": info.get("user_id", ""),
-                                "notebook_id": info.get("notebook_id", ""),
+                                "notebook_id": f"{info.get('notebook_title')} ({info.get('notebook_id')})" if info.get("notebook_title") else info.get("notebook_id", ""),
                                 "last_query_at": info.get("last_query_at", ""),
                                 "last_question": last_q,
                                 "remark": info.get("remark", "")
@@ -4913,6 +4944,7 @@ def make_handler(config: AppConfig):
                                 "user_id": owner_id,
                                 "user_name": owner_name or "Unknown",
                                 "notebook_id": info.get("notebook_id", ""),
+                                "notebook_title": info.get("notebook_title", ""),
                                 "created_at": info.get("created_at", ""),
                                 "last_query_at": info.get("last_query_at", ""),
                                 "last_question": last_q,

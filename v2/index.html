@@ -2818,7 +2818,13 @@
 
     async function sendNLMMessage(question) {
       const input = document.getElementById('nlm-chat-input');
-      const notebookId = document.getElementById('nlm-notebook-select').value;
+      const notebookSelect = document.getElementById('nlm-notebook-select');
+      const notebookId = notebookSelect.value;
+      let notebookTitle = '';
+      if (notebookSelect.selectedIndex >= 0) {
+        notebookTitle = notebookSelect.options[notebookSelect.selectedIndex].text;
+        notebookTitle = notebookTitle.replace(/\s*\(\d+\s*sources\)\s*$/, '').trim();
+      }
       const userName = document.getElementById('global-user-name').value.trim();
 
       if (!question) return;
@@ -2883,6 +2889,7 @@
       try {
         const formData = new URLSearchParams();
         formData.append('notebook_id', notebookId);
+        formData.append('notebook_title', notebookTitle);
         formData.append('user_name', userName);
         formData.append('conversation_id', currentNlmSessionId);
         formData.append('question', question);

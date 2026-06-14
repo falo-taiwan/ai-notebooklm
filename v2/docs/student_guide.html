@@ -198,8 +198,15 @@
     <li><b>管理員唯讀審計</b>：Admin 在 <code>admin.html</code> 可查看所有人對話的文本，但系統於後端 API（<code>/ask</code> 端點）阻擋了 Admin 對他人對話發送訊息的權限，防止 Admin 的訊息干擾到對方的對話視窗。</li>
   </ul>
 
+  <h2>📚 v2.20 延伸功能：跨書庫交叉對話與精細稽核設計</h2>
+  <p>為了解決企業在不同專案知識間的<b>交叉比對與綜合查詢</b>需求，v2.20 實現了極具彈性的跨書庫對話：</p>
+  <ul>
+    <li><b>打破官方鎖定限制</b>：Google 官方的對話 Conversation 預設只能終身鎖定單一筆記本。地端系統支援使用者在同一個對話中，隨時切換下拉選單向不同書庫發問，極大地提升了交叉查詢與對照分析的靈活性。</li>
+    <li><b>問答輪次級審計 (Turn-level Audit)</b>：在 <code>data/multichat_sessions.json</code> 資料庫中，系統會精準在每一輪提問的 <code>user</code> turn 內部，單獨記錄當時發問選取的 <code>notebook_id</code> 與 <code>notebook_title</code>，使稽核日誌完整可溯。</li>
+  </ul>
+
   <div class="note">
-    <b>Lab 建議：</b>學員可以直接在專案啟動後打開 <code>data/multichat_sessions.json</code>，在發送對話的同時觀察 JSON 中的 <code>user_id</code> 欄位是如何動態寫入並與目前登入帳號連動的。
+    <b>Lab 建議：</b>學員可以直接在專案啟動後打開 <code>data/multichat_sessions.json</code>，在發送對話的同時觀察 JSON 中的 <code>user_id</code> 欄位以及 <code>turns</code> 陣列內部的 <code>notebook_title</code> 是如何動態寫入的。
   </div>
 </main>
 </body>
