@@ -21,7 +21,7 @@
 
 ## 🛠️ 2. 專案解壓縮與目錄定位
 
-1. 將最新的專案壓縮檔 `AI_NotebookLM_v2.20_gas_portal_redirect_fix.zip` 解壓縮至您的 Windows 工作資料夾（例如：`D:\Workspace\AI_NotebookLM`）。
+1. 將最新的專案壓縮檔 `AI_NotebookLM_v3.01_Windows_Deploy.zip` 解壓縮至您的 Windows 工作資料夾（例如：`D:\Workspace\AI_NotebookLM`）。
 2. 用 VS Code 開啟此資料夾，並開啟終端機（Terminal）。
 
 ---

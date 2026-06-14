@@ -1,4 +1,4 @@
-# AI NotebookLM Runtime Lab - 學生教學導覽手冊 (v2.19)
+# AI NotebookLM Runtime Lab - 學生教學導覽手冊 (v3.01)
 
 本專案是一個整合 **地端 Python 伺服器 (Runtime Server)**、**前端操作面板 (Portal)**、**Google Apps Script (GAS)** 以及 **Excel 資料治理 (ETL/Audit)** 的全棧教學系統。
 
@@ -83,9 +83,9 @@ graph TD
 
 ## 💡 學員實驗重點提示 (Lab Focus)
 1.  **地端優先 (Local-First)**：系統不依賴重量級雲端資料庫，使用輕量級的 JSON 檔案作為資料庫，學員可直接打開 `data/` 下的 JSON 觀察資料結構的變動。
-2.  **角色與權限隔離 (v2.19)**：
+2.  **角色與權限隔離 (v3.01)**：
     *   **一般同仁**登入後（使用帳密或金鑰），只能在 `index.html` 看到與聊天自己擁有的 Session。
     *   **Admin** 可以在 `admin.html` 看到所有同仁的審計紀錄，但後端限制了 Admin 介入他人對話的權限，防止 Admin 的訊息干擾到對方的對話視窗。
-3.  **跨書庫交叉對話 (v2.20+)**：
+3.  **跨書庫交叉對話 (v3.01+)**：
     *   **打破官方限制**：Google NotebookLM 官方對話是終身鎖定單一筆記本的。地端系統支援在「同一個對話中隨時切換下拉選單」向不同書庫提問，提供極佳的**交叉比對、綜合查詢與對照運用**的靈活性。
     *   **精密治理**：後端在 `multichat_sessions.json` 資料庫中以 `turns` 陣列內部精確地在每一輪問答節點上記錄當時發問的 `notebook_id` 和 `notebook_title`，完美平衡了「使用者操作彈性」與「管理稽核審計需求」。

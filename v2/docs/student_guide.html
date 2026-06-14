@@ -117,7 +117,7 @@
 <body>
 <main>
   <h1>AI NotebookLM Runtime Lab</h1>
-  <p class="lead">學生教學導覽手冊 (v2.19) - 探索地端優先的 AI 排程與治理系統</p>
+  <p class="lead">學生教學導覽手冊 (v3.01) - 探索地端優先的 AI 排程與治理系統</p>
   
   <div class="navlinks">
     <a href="../index.html">返回首頁</a>
@@ -191,15 +191,15 @@
     </div>
   </div>
 
-  <h2>🔒 v2.19 核心教學設計：角色隔離與防 hijacking 語意</h2>
-  <p>為了讓學員理解企業級軟體開發中的<b>最小權限原則（Least Privilege）</b>，v2.19 引入了嚴格的對話 Session 擁有權隔離：</p>
+  <h2>🔒 v3.01 核心教學設計：角色隔離與防 hijacking 語意</h2>
+  <p>為了讓學員理解企業級軟體開發中的<b>最小權限原則（Least Privilege）</b>，v3.01 引入了嚴格的對話 Session 擁有權隔離：</p>
   <ul>
     <li><b>個人對話專屬</b>：一般同仁與訪客只能調閱自己所擁有的 Session 列表與歷史紀錄。</li>
     <li><b>管理員唯讀審計</b>：Admin 在 <code>admin.html</code> 可查看所有人對話的文本，但系統於後端 API（<code>/ask</code> 端點）阻擋了 Admin 對他人對話發送訊息的權限，防止 Admin 的訊息干擾到對方的對話視窗。</li>
   </ul>
 
-  <h2>📚 v2.20 延伸功能：跨書庫交叉對話與精細稽核設計</h2>
-  <p>為了解決企業在不同專案知識間的<b>交叉比對與綜合查詢</b>需求，v2.20 實現了極具彈性的跨書庫對話：</p>
+  <h2>📚 v3.01 延伸功能：跨書庫交叉對話與精細稽核設計</h2>
+  <p>為了解決企業在不同專案知識間的<b>交叉比對與綜合查詢</b>需求，v3.01 實現了極具彈性的跨書庫對話：</p>
   <ul>
     <li><b>打破官方鎖定限制</b>：Google 官方的對話 Conversation 預設只能終身鎖定單一筆記本。地端系統支援使用者在同一個對話中，隨時切換下拉選單向不同書庫發問，極大地提升了交叉查詢與對照分析的靈活性。</li>
     <li><b>問答輪次級審計 (Turn-level Audit)</b>：在 <code>data/multichat_sessions.json</code> 資料庫中，系統會精準在每一輪提問的 <code>user</code> turn 內部，單獨記錄當時發問選取的 <code>notebook_id</code> 與 <code>notebook_title</code>，使稽核日誌完整可溯。</li>

@@ -31,8 +31,8 @@ import openpyxl
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-APP_VERSION = "v2.19"
-APP_WATERMARK = "v2.19版 Falo x Force Cheng 2026/6/14"
+APP_VERSION = "v3.01"
+APP_WATERMARK = "v3.01版 Falo x Force Cheng 2026/6/15"
 TAIPEI_TZ = ZoneInfo("Asia/Taipei")
 DEFAULT_SIMPLE_TYPES = [".pdf", ".txt", ".md", ".csv", ".docx", ".xlsx", ".pptx", ".png", ".jpg", ".jpeg"]
 _GAS_AUTO_WORKER_STARTED = False
