@@ -1074,12 +1074,164 @@
       <span>環境: <strong style="color: var(--accent-audit);">0.0.0.0 (對同網段開放)</strong></span>
     </div>
     <div>
-      <a href="index.html" style="margin-right: 15px; font-weight: 600;">🔗 回到首頁平台 (index.html)</a>
+      <a href="index.html" style="margin-right: 15px; font-weight: 600;">🖥️ 回到主對話入口 (index.html)</a>
+      <a href="gas-web.html" style="margin-right: 15px; font-weight: 600;">🔗 GAS 雲端中控台 (gas-web.html)</a>
       <span>AI NotebookLM Local-First Portal &copy; 2026.</span>
     </div>
   </footer>
 
   <script>
+    // --- Static Showcase Mock / POC Interceptor ---
+    const isStaticPages = window.location.hostname.endsWith('github.io') || window.location.protocol === 'file:';
+    if (isStaticPages) {
+      if (!localStorage.getItem('mock_selectable_notebooks')) {
+        localStorage.setItem('mock_selectable_notebooks', JSON.stringify([
+          { id: "book-01", title: "Falo x Force 課堂講義：AI 生成應用", nlm_visible: true, user_bound: "demo_user" },
+          { id: "book-02", title: "企業核心數據治理與雲端稽核規範", nlm_visible: true, user_bound: "" },
+          { id: "book-03", title: "地端大模型微調與本地部署實戰", nlm_visible: false, user_bound: "" }
+        ]));
+      }
+      if (!localStorage.getItem('mock_admin_users')) {
+        localStorage.setItem('mock_admin_users', JSON.stringify([
+          { user_id: "admin", display_name: "林經理 (Admin)", role: "admin", password_hash: "666666", active: true },
+          { user_id: "manager", display_name: "張督導 (Manager)", role: "document_manager", password_hash: "666666", active: true },
+          { user_id: "demo_user", display_name: "體驗訪客", role: "user", password_hash: "123456", active: true }
+        ]));
+      }
+      if (!localStorage.getItem('mock_gas_settings')) {
+        localStorage.setItem('mock_gas_settings', JSON.stringify({
+          enabled: true,
+          auto_poll_enabled: false,
+          web_app_url: "https://script.google.com/macros/s/AKfycbw9X3Y6MQ2XpvsS9BXuCZeZsVkrbT1VL0JkDkotrbs-omYG8OpuWpAl1fowiJa_QW1i/exec",
+          poll_interval_seconds: 600,
+          max_tasks_per_poll: 3,
+          auto_execute: false,
+          local_download_root: "data/gas_downloads",
+          default_file_types: [".pdf", ".md", ".csv", ".docx", ".xlsx"],
+          default_duplicate_policy: "rename"
+        }));
+      }
+      if (!localStorage.getItem('mock_gas_history')) {
+        localStorage.setItem('mock_gas_history', JSON.stringify([
+          { task_id: "task-001", created_at: "2026-06-14T23:50:00Z", submitter: "demo_user", action: "import", status: "completed", result: "Synced successfully" },
+          { task_id: "task-002", created_at: "2026-06-15T00:10:00Z", submitter: "admin", action: "export", status: "completed", result: "Exported 42 records" }
+        ]));
+      }
+
+      const originalFetch = window.fetch;
+      window.fetch = async function(url, options) {
+        const urlObj = new URL(url, window.location.href);
+        const path = urlObj.pathname;
+        const method = (options && options.method || 'GET').toUpperCase();
+        
+        await new Promise(r => setTimeout(r, 500));
+
+        if (path.endsWith('/api/local-session')) {
+          return new Response(JSON.stringify({
+            ok: true,
+            session: {
+              user_id: "admin",
+              display_name: "林經理 (Admin)",
+              role: "admin"
+            }
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/multichat/sessions')) {
+          return new Response(JSON.stringify({
+            ok: true,
+            sessions: [
+              { conversation_id: "demo-session-1", user_name: "demo_user", title: "如何評估 AI 專案效益？", remarks: "教學展示用 Session", last_query_at: "2026-06-15T00:20:00.000Z", total_turns: 2 },
+              { conversation_id: "demo-session-2", user_name: "demo_user", title: "Apps Script 安全性管理", remarks: "雙向授權設定範例", last_query_at: "2026-06-15T00:21:00.000Z", total_turns: 2 }
+            ]
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/gemini/sessions')) {
+          return new Response(JSON.stringify({
+            ok: true,
+            sessions: [
+              { conversation_id: "gemini-session-1", user_name: "demo_user", title: "Gemini 1.5 Pro 長上下文測試", remarks: "測試 2M token 運作", last_query_at: "2026-06-15T00:15:00.000Z", total_turns: 2 }
+            ]
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/multichat/history') || path.endsWith('/api/gemini/history')) {
+          const sessId = urlObj.searchParams.get('conversation_id');
+          const isNlm = path.includes('multichat');
+          const mockData = isNlm ? {
+            "demo-session-1": [
+              {"role": "user", "content": "你好，請問導入 AI 專案的第一步是什麼？"},
+              {"role": "model", "content": "導入 AI 專案的第一步是**釐清業務痛點與定義成功指標(KPI)**。許多團隊常犯的錯誤是「為了使用 AI 而使用 AI」，正確的做法應是從實際需求出發，評估 AI 是否能顯著提升效率或解決瓶頸。"}
+            ],
+            "demo-session-2": [
+              {"role": "user", "content": "GAS Web App 怎麼設定成任何人都能存取但又能確保安全？"},
+              {"role": "model", "content": "建議在部署時將「執行身分」設為「自己(Me)」，「誰有存取權」設為「任何人(Anyone)」。接著在代碼中實作 API Token 驗證機制，只有攜帶正確 Token 的地端 Worker 請求才予以回應，藉此達到雲地安全防護隔離。"}
+            ]
+          } : {
+            "gemini-session-1": [
+              {"role": "user", "content": "Gemini 1.5 Pro 的原生百萬上下文有什麼具體應用場景？"},
+              {"role": "model", "content": "主要場景包括：一次上傳數十份大型 PDF 技術文件、上傳整套程式庫(Repository)進行代碼分析重構、或分析長達數小時的完整會議影片與錄音紀錄，免去傳統 RAG 切割文本導致上下文丟失的缺點。"}
+            ]
+          };
+          const turns = mockData[sessId] || [];
+          return new Response(JSON.stringify({ ok: true, turns: turns, title: "對話明細" }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/gas/settings')) {
+          const settings = JSON.parse(localStorage.getItem('mock_gas_settings'));
+          return new Response(JSON.stringify({ ok: true, settings: settings }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/gas/settings/save')) {
+          const body = JSON.parse(options.body);
+          localStorage.setItem('mock_gas_settings', JSON.stringify(body.settings));
+          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/gas-test')) {
+          return new Response(JSON.stringify({ ok: true, result: "🟢 連線測試成功！(Simulated)" }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/gas/wan-url')) {
+          return new Response(JSON.stringify({ ok: true, wan_url: "https://your-ngrok.ngrok-free.dev (Simulated)" }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/gas/history')) {
+          const list = JSON.parse(localStorage.getItem('mock_gas_history'));
+          return new Response(JSON.stringify({ ok: true, history: list }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/admin/selectable-notebooks')) {
+          const list = JSON.parse(localStorage.getItem('mock_selectable_notebooks'));
+          return new Response(JSON.stringify({ ok: true, notebooks: list }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/admin/selectable-notebooks/save')) {
+          const body = JSON.parse(options.body);
+          localStorage.setItem('mock_selectable_notebooks', JSON.stringify(body.notebooks));
+          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/admin/users')) {
+          const list = JSON.parse(localStorage.getItem('mock_admin_users'));
+          return new Response(JSON.stringify({ ok: true, users: list }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/admin/users/save')) {
+          const body = JSON.parse(options.body);
+          localStorage.setItem('mock_admin_users', JSON.stringify(body.users));
+          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/gas/push-host-info')) {
+          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        return originalFetch(url, options);
+      };
+    }
+
     // --- States & Themes ---
     let currentAdminTab = 'audit';
     let auditLogs = [];

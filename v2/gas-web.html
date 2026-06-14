@@ -271,7 +271,7 @@
           <div style="flex: 2; min-width: 280px;">
             <label for="gas-url-input" style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 6px; font-weight: 600;">🔗 雲端中控 Web App 網址 (GAS URL)</label>
             <div style="display: flex; gap: 8px;">
-              <input type="text" id="gas-url-input" placeholder="https://script.google.com/macros/s/.../exec" style="margin: 0; padding: 6px 12px; font-size: 0.82rem; outline: none; background-color: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); flex: 1;">
+              <input type="text" id="gas-url-input" value="https://script.google.com/macros/s/AKfycbw9X3Y6MQ2XpvsS9BXuCZeZsVkrbT1VL0JkDkotrbs-omYG8OpuWpAl1fowiJa_QW1i/exec" placeholder="https://script.google.com/macros/s/.../exec" style="margin: 0; padding: 6px 12px; font-size: 0.82rem; outline: none; background-color: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); flex: 1;">
               <button id="ping-btn" onclick="testGasConnection(this)" class="secondary" style="white-space: nowrap; padding: 6px 12px;">連線</button>
             </div>
           </div>
@@ -1543,6 +1543,8 @@
       const savedGasUrl = localStorage.getItem('falo_gas_url');
       if (savedGasUrl) {
         document.getElementById('gas-url-input').value = savedGasUrl;
+      } else {
+        document.getElementById('gas-url-input').value = 'https://script.google.com/macros/s/AKfycbw9X3Y6MQ2XpvsS9BXuCZeZsVkrbT1VL0JkDkotrbs-omYG8OpuWpAl1fowiJa_QW1i/exec';
       }
       
       let auth = null;
@@ -1558,13 +1560,8 @@
       if (auth && savedGasUrl) {
         refreshStatusSilent(auth.token);
       } else {
-        if (savedGasUrl) {
-          // 預設不自動加載資料，點選「連線」按鈕後才加載
-          // refreshGuestStatus();
-        } else {
-          document.getElementById('conn-status-msg').textContent = '⚠️ 請先輸入您的 Google Apps Script 部署 URL 並點選連線。';
-          document.getElementById('conn-status-msg').className = 'conn-status conn-fail';
-        }
+        // Automatically fetch guest status if default URL is present
+        refreshGuestStatus();
       }
     }
 

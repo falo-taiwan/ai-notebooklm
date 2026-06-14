@@ -1798,12 +1798,195 @@
       <span>環境: <strong style="color: var(--accent-nlm);">0.0.0.0 (對同網段開放)</strong></span>
     </div>
     <div>
-      <a href="index-old.html" target="_blank" style="margin-right: 15px;">🔗 瀏覽舊版管理員入口 (index-old.html)</a>
+      <a href="admin.html" target="_blank" style="margin-right: 15px;">🖥️ 管理員審計後台 (admin.html)</a>
+      <a href="gas-web.html" target="_blank" style="margin-right: 15px;">🔗 GAS 雲端中控台 (gas-web.html)</a>
+      <a href="index-old.html" target="_blank" style="margin-right: 15px;">🔗 舊版入口</a>
       <span>AI NotebookLM Local-First Portal &copy; 2026.</span>
     </div>
   </footer>
 
   <script>
+    // --- Static Showcase Mock / POC Interceptor ---
+    const isStaticPages = window.location.hostname.endsWith('github.io') || window.location.protocol === 'file:';
+    if (isStaticPages) {
+      if (!localStorage.getItem('mock_multichat_sessions')) {
+        localStorage.setItem('mock_multichat_sessions', JSON.stringify({
+          "demo-session-1": {
+            "title": "如何評估 AI 專案效益？",
+            "remarks": "教學展示用 Session",
+            "turns": [
+              {"role": "user", "content": "你好，請問導入 AI 專案的第一步是什麼？"},
+              {"role": "model", "content": "導入 AI 專案的第一步是**釐清業務痛點與定義成功指標(KPI)**。許多團隊常犯的錯誤是「為了使用 AI 而使用 AI」，正確的做法應是從實際需求出發，評估 AI 是否能顯著提升效率或解決瓶頸。"}
+            ]
+          },
+          "demo-session-2": {
+            "title": "Apps Script 安全性管理",
+            "remarks": "雙向授權設定範例",
+            "turns": [
+              {"role": "user", "content": "GAS Web App 怎麼設定成任何人都能存取但又能確保安全？"},
+              {"role": "model", "content": "建議在部署時將「執行身分」設為「自己(Me)」，「誰有存取權」設為「任何人(Anyone)」。接著在代碼中實作 API Token 驗證機制，只有攜帶正確 Token 的地端 Worker 請求才予以回應，藉此達到雲地安全防護隔離。"}
+            ]
+          }
+        }));
+      }
+      if (!localStorage.getItem('mock_gemini_sessions')) {
+        localStorage.setItem('mock_gemini_sessions', JSON.stringify({
+          "gemini-session-1": {
+            "title": "Gemini 1.5 Pro 長上下文測試",
+            "remarks": "測試 2M token 運作",
+            "turns": [
+              {"role": "user", "content": "Gemini 1.5 Pro 的原生百萬上下文有什麼具體應用場景？"},
+              {"role": "model", "content": "主要場景包括：一次上傳數十份大型 PDF 技術文件、上傳整套程式庫(Repository)進行代碼分析重構、或分析長達數小時的完整會議影片與錄音紀錄，免去傳統 RAG 切割文本導致上下文丟失的缺點。"}
+            ]
+          }
+        }));
+      }
+
+      const originalFetch = window.fetch;
+      window.fetch = async function(url, options) {
+        const urlObj = new URL(url, window.location.href);
+        const path = urlObj.pathname;
+        const method = (options && options.method || 'GET').toUpperCase();
+        
+        await new Promise(r => setTimeout(r, 600));
+
+        if (path.endsWith('/api/local-session')) {
+          return new Response(JSON.stringify({
+            ok: true,
+            session: {
+              user_id: "poc_tester",
+              display_name: "體驗訪客 (POC 靜態展示)",
+              role: "admin"
+            }
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        
+        if (path.endsWith('/api/status')) {
+          return new Response(JSON.stringify({
+            ok: true,
+            status: "Running (POC Simulated)",
+            port: 8765,
+            workers: 4,
+            uptime_seconds: 7200
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/notebooks')) {
+          return new Response(JSON.stringify({
+            ok: true,
+            notebooks: [
+              { id: "book-01", title: "Falo x Force 課堂講義：AI 生成應用" },
+              { id: "book-02", title: "企業核心數據治理與雲端稽核規範" },
+              { id: "book-03", title: "地端大模型微調與本地部署實戰" }
+            ]
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/multichat/sessions')) {
+          const sessions = JSON.parse(localStorage.getItem('mock_multichat_sessions') || '{}');
+          const list = Object.keys(sessions).map(id => ({
+            conversation_id: id,
+            title: sessions[id].title,
+            remarks: sessions[id].remarks || '',
+            last_message_at: new Date().toISOString()
+          }));
+          return new Response(JSON.stringify({ ok: true, sessions: list }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/gemini/sessions')) {
+          const sessions = JSON.parse(localStorage.getItem('mock_gemini_sessions') || '{}');
+          const list = Object.keys(sessions).map(id => ({
+            conversation_id: id,
+            title: sessions[id].title,
+            remarks: sessions[id].remarks || '',
+            last_message_at: new Date().toISOString()
+          }));
+          return new Response(JSON.stringify({ ok: true, sessions: list }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/multichat/history') || path.endsWith('/api/gemini/history')) {
+          const sessId = urlObj.searchParams.get('conversation_id');
+          const storageKey = path.includes('multichat') ? 'mock_multichat_sessions' : 'mock_gemini_sessions';
+          const sessions = JSON.parse(localStorage.getItem(storageKey) || '{}');
+          const session = sessions[sessId] || { title: "新對話", turns: [] };
+          return new Response(JSON.stringify({ ok: true, turns: session.turns, title: session.title }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/multichat/ask') || path.endsWith('/api/gemini/ask')) {
+          const body = JSON.parse(options.body);
+          const sessId = body.conversation_id || 'new-' + Math.random().toString(36).substr(2, 9);
+          const question = body.question;
+          const storageKey = path.includes('multichat') ? 'mock_multichat_sessions' : 'mock_gemini_sessions';
+          const sessions = JSON.parse(localStorage.getItem(storageKey) || '{}');
+          
+          let sess = sessions[sessId];
+          if (!sess) {
+            sess = {
+              title: question.substring(0, 15) + (question.length > 15 ? '...' : ''),
+              remarks: "Simulated chat",
+              turns: []
+            };
+          }
+          
+          sess.turns.push({ role: "user", content: question });
+          
+          let reply = "這是一個 POC 靜態概念版模擬的回覆。在實際運作中，此動作將會傳送給地端的 Python Server，並透過 API 存取您的 NotebookLM 或 Gemini 實體來回答您的問題。\n\n您剛剛詢問的問題是：`" + question + "`。";
+          if (question.includes("專案") || question.includes("AI")) {
+            reply += "\n\n針對 AI 專案導入與評估，一般建議從小規模 MVP 開始驗證（如本 POC 版本），建立利害關係人的信心後，再行擴大整合。";
+          } else {
+            reply += "\n\n您可以嘗試在真實的地端環境中啟動 `./FALO_Runtime.command` 伺服器來體驗無縫的本地大模型與 NotebookLM 串接！";
+          }
+          
+          sess.turns.push({ role: "model", content: reply });
+          sessions[sessId] = sess;
+          localStorage.setItem(storageKey, JSON.stringify(sessions));
+
+          return new Response(JSON.stringify({
+            ok: true,
+            conversation_id: sessId,
+            answer: reply
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/multichat/delete')) {
+          const body = JSON.parse(options.body);
+          const sessId = body.conversation_id;
+          const sessions = JSON.parse(localStorage.getItem('mock_multichat_sessions') || '{}');
+          delete sessions[sessId];
+          localStorage.setItem('mock_multichat_sessions', JSON.stringify(sessions));
+          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/session/remark')) {
+          const body = JSON.parse(options.body);
+          const sessId = body.conversation_id;
+          const remark = body.remark;
+          const isNlm = body.platform === 'notebooklm';
+          const storageKey = isNlm ? 'mock_multichat_sessions' : 'mock_gemini_sessions';
+          const sessions = JSON.parse(localStorage.getItem(storageKey) || '{}');
+          if (sessions[sessId]) {
+            sessions[sessId].remarks = remark;
+            localStorage.setItem(storageKey, JSON.stringify(sessions));
+          }
+          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/queue/active')) {
+          return new Response(JSON.stringify({ ok: true, active_tasks: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (path.endsWith('/api/gas/wan-url')) {
+          return new Response(JSON.stringify({ ok: true, wan_url: "https://your-ngrok.ngrok-free.dev (POC)" }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        
+        if (path.endsWith('/api/gas/push-host-info')) {
+          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        return originalFetch(url, options);
+      };
+    }
+
     // --- States & Configs ---
     let currentTab = 'nlm';
     let queueInterval = null;
@@ -1813,7 +1996,7 @@
 
     // Toggle Admin Mode
     function toggleAdminMode() {
-      window.open('/admin.html', '_blank');
+      window.open('admin.html', '_blank');
     }
 
     function applyAdminMode() {
