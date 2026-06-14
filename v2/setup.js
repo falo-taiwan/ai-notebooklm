@@ -9,7 +9,7 @@ function setupSheet() {
   // 1. Reset or create Settings sheet with mock active host info
   resetOrCreateSheet_(ss, SHEETS.SETTINGS, HEADERS.Settings, [
     ['api_token', DEFAULT_TOKEN, 'Local Python worker must send this token.'],
-    ['portal_url', 'https://www.google.com.tw', 'The external login page / frontend URL to redirect users to.'],
+    ['portal_url', 'https://falo-taiwan.github.io/ai-notebooklm/v2/gas-web.html', 'The external login page / frontend URL to redirect users to.'],
     ['workstation_url', 'http://192.168.6.8:8765', 'Local runtime URL.'],
     ['workstation_routing_mode', 'latest', 'Host routing mode: latest or manual.'],
     ['workstation_manual_host', '', 'Designated workstation hostname (when in manual mode).'],
