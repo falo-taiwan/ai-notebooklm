@@ -6,9 +6,10 @@
 
 ## Public Page
 
-- GitHub Pages: <https://falo-chinese.github.io/ai-notebooklm/>
-- Refactor Notes: <https://falo-chinese.github.io/ai-notebooklm/docs/refactor_notes.html>
-- Command Package Example: <https://falo-chinese.github.io/ai-notebooklm/examples/sample_command_package_upload_folder.json>
+- GitHub Pages: <https://falo-taiwan.github.io/ai-notebooklm/>
+- Refactor Notes: <https://falo-taiwan.github.io/ai-notebooklm/docs/refactor_notes.html>
+- Student Guide: <https://falo-taiwan.github.io/ai-notebooklm/docs/student_guide.html>
+- Command Package Example: <https://falo-taiwan.github.io/ai-notebooklm/examples/sample_command_package_upload_folder.json>
 
 ## 核心概念
 
