@@ -1814,16 +1814,20 @@
           "demo-session-1": {
             "title": "如何評估 AI 專案效益？",
             "remarks": "教學展示用 Session",
+            "notebook_id": "book-01",
+            "notebook_title": "Falo x Force 課堂講義：AI 生成應用",
             "turns": [
-              {"role": "user", "content": "你好，請問導入 AI 專案的第一步是什麼？"},
+              {"role": "user", "content": "你好，請問導入 AI 專案的第一步是什麼？", "notebook_id": "book-01", "notebook_title": "Falo x Force 課堂講義：AI 生成應用"},
               {"role": "model", "content": "導入 AI 專案的第一步是**釐清業務痛點與定義成功指標(KPI)**。許多團隊常犯的錯誤是「為了使用 AI 而使用 AI」，正確的做法應是從實際需求出發，評估 AI 是否能顯著提升效率或解決瓶頸。"}
             ]
           },
           "demo-session-2": {
             "title": "Apps Script 安全性管理",
             "remarks": "雙向授權設定範例",
+            "notebook_id": "book-02",
+            "notebook_title": "企業核心數據治理與雲端稽核規範",
             "turns": [
-              {"role": "user", "content": "GAS Web App 怎麼設定成任何人都能存取但又能確保安全？"},
+              {"role": "user", "content": "GAS Web App 怎麼設定成任何人都能存取但又能確保安全？", "notebook_id": "book-02", "notebook_title": "企業核心數據治理與雲端稽核規範"},
               {"role": "model", "content": "建議在部署時將「執行身分」設為「自己(Me)」，「誰有存取權」設為「任何人(Anyone)」。接著在代碼中實作 API Token 驗證機制，只有攜帶正確 Token 的地端 Worker 請求才予以回應，藉此達到雲地安全防護隔離。"}
             ]
           }
@@ -1888,6 +1892,8 @@
             conversation_id: id,
             title: sessions[id].title,
             remarks: sessions[id].remarks || '',
+            notebook_id: sessions[id].notebook_id || '',
+            notebook_title: sessions[id].notebook_title || '',
             last_message_at: new Date().toISOString()
           }));
           return new Response(JSON.stringify({ ok: true, sessions: list }), { status: 200, headers: { 'Content-Type': 'application/json' } });

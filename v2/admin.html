@@ -797,7 +797,10 @@
             <h3>地端多用戶會話審計紀錄</h3>
             <p style="font-size: 0.82rem; color: var(--text-muted);">所有連入此地端主機的詢問均在此完整記錄（包含同仁姓名、所用會話 ID 、最後提問與備註說明）。</p>
           </div>
-          <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <select id="audit-notebook-filter" onchange="filterAuditLogs()" style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 8px; padding: 10px 14px; font-size: 0.9rem; cursor: pointer; outline: none; transition: border 0.2s;">
+              <option value="all">🔍 所有書庫 (All)</option>
+            </select>
             <input type="text" class="search-input" id="audit-search" placeholder="搜尋同仁、對話備註、問答關鍵字..." oninput="filterAuditLogs()">
             <button class="btn-secondary-action" onclick="loadAuditLogs()">重新整理 🔄</button>
             <button class="btn-secondary-action" onclick="exportAuditLogsExcel()">📤 匯出 Excel</button>
@@ -1141,8 +1144,8 @@
           return new Response(JSON.stringify({
             ok: true,
             sessions: [
-              { conversation_id: "demo-session-1", user_name: "demo_user", title: "如何評估 AI 專案效益？", remarks: "教學展示用 Session", last_query_at: "2026-06-15T00:20:00.000Z", total_turns: 2 },
-              { conversation_id: "demo-session-2", user_name: "demo_user", title: "Apps Script 安全性管理", remarks: "雙向授權設定範例", last_query_at: "2026-06-15T00:21:00.000Z", total_turns: 2 }
+              { conversation_id: "demo-session-1", user_name: "demo_user", title: "如何評估 AI 專案效益？", remarks: "教學展示用 Session", last_query_at: "2026-06-15T00:20:00.000Z", total_turns: 2, notebook_id: "book-01", notebook_title: "Falo x Force 課堂講義：AI 生成應用" },
+              { conversation_id: "demo-session-2", user_name: "demo_user", title: "Apps Script 安全性管理", remarks: "雙向授權設定範例", last_query_at: "2026-06-15T00:21:00.000Z", total_turns: 2, notebook_id: "book-02", notebook_title: "企業核心數據治理與雲端稽核規範" }
             ]
           }), { status: 200, headers: { 'Content-Type': 'application/json' } });
         }
@@ -1161,17 +1164,17 @@
           const isNlm = path.includes('multichat');
           const mockData = isNlm ? {
             "demo-session-1": [
-              {"role": "user", "content": "你好，請問導入 AI 專案的第一步是什麼？"},
+              {"role": "user", "content": "你好，請問導入 AI 專案的第一步是什麼？", "notebook_id": "book-01", "notebook_title": "Falo x Force 課堂講義：AI 生成應用"},
               {"role": "model", "content": "導入 AI 專案的第一步是**釐清業務痛點與定義成功指標(KPI)**。許多團隊常犯的錯誤是「為了使用 AI 而使用 AI」，正確的做法應是從實際需求出發，評估 AI 是否能顯著提升效率或解決瓶頸。"}
             ],
             "demo-session-2": [
-              {"role": "user", "content": "GAS Web App 怎麼設定成任何人都能存取但又能確保安全？"},
+              {"role": "user", "content": "GAS Web App 怎麼設定成任何人都能存取但又能確保安全？", "notebook_id": "book-02", "notebook_title": "企業核心數據治理與雲端稽核規範"},
               {"role": "model", "content": "建議在部署時將「執行身分」設為「自己(Me)」，「誰有存取權」設為「任何人(Anyone)」。接著在代碼中實作 API Token 驗證機制，只有攜帶正確 Token 的地端 Worker 請求才予以回應，藉此達到雲地安全防護隔離。"}
             ]
           } : {
             "gemini-session-1": [
               {"role": "user", "content": "Gemini 1.5 Pro 的原生百萬上下文有什麼具體應用場景？"},
-              {"role": "model", "content": "主要場景包括：一次上傳數十份大型 PDF 技術文件、上傳整套程式庫(Repository)進行代碼分析重構、或分析長達數小時的完整會議影片與錄音紀錄，免去傳統 RAG 切割文本導致上下文丟失的缺點。"}
+              {"role": "model", "content": "主要場景包括：一次上傳數十份大型 PDF 技術文件、上傳整套程式庫(Repository)進行代碼 analysis 重構、或分析長達數小時的完整會議影片與錄音紀錄，免去傳統 RAG 切割文本導致上下文丟失的缺點。"}
             ]
           };
           const turns = mockData[sessId] || [];
@@ -1427,10 +1430,62 @@
         // Sort descending
         auditLogs.sort((a, b) => new Date(b.last_query_at.replace(/-/g, '/')) - new Date(a.last_query_at.replace(/-/g, '/')));
         renderAuditTable(auditLogs);
+        populateNotebookFilter();
         updateSortHeaders('audit', auditSort);
       } catch (err) {
         tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:hsl(0,85%,65%);">審計檔載入失敗: ${err.message}</td></tr>`;
       }
+    }
+
+    function populateNotebookFilter() {
+      const select = document.getElementById('audit-notebook-filter');
+      if (!select) return;
+      
+      const currentValue = select.value;
+      select.innerHTML = '<option value="all">🔍 所有書庫 (All)</option>';
+      
+      const uniqueBooks = {};
+      auditLogs.forEach(log => {
+        if (log.notebook_id) {
+          uniqueBooks[log.notebook_id] = log.notebook_title || log.notebook_id;
+        }
+      });
+      
+      Object.keys(uniqueBooks).forEach(id => {
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = `${uniqueBooks[id]} (${id})`;
+        select.appendChild(opt);
+      });
+      
+      if (uniqueBooks[currentValue]) {
+        select.value = currentValue;
+      } else {
+        select.value = 'all';
+      }
+    }
+
+    function filterAuditLogs() {
+      const query = document.getElementById('audit-search').value.toLowerCase().trim();
+      const notebookFilter = document.getElementById('audit-notebook-filter').value;
+      
+      let filtered = auditLogs;
+      
+      if (notebookFilter !== 'all') {
+        filtered = filtered.filter(log => log.notebook_id === notebookFilter);
+      }
+      
+      if (query) {
+        filtered = filtered.filter(log => {
+          return log.user_name.toLowerCase().includes(query) ||
+                 log.conversation_id.toLowerCase().includes(query) ||
+                 (log.notebook_id && log.notebook_id.toLowerCase().includes(query)) ||
+                 (log.notebook_title && log.notebook_title.toLowerCase().includes(query)) ||
+                 log.remark.toLowerCase().includes(query) ||
+                 (log.last_question && log.last_question.toLowerCase().includes(query));
+        });
+      }
+      renderAuditTable(filtered);
     }
 
     function renderAuditTable(logs) {
