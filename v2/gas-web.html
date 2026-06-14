@@ -99,616 +99,1355 @@
     }
     input[type="text"]:focus, input[type="password"]:focus, select:focus {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--glow);
+      box-shadow: 0 0 0 3px rgba(56, 139, 253, 0.3);
     }
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 6px 12px;
-      font-size: 0.88rem;
-      font-weight: 500;
-      line-height: 20px;
-      white-space: nowrap;
-      vertical-align: middle;
-      cursor: pointer;
-      user-select: none;
-      border: 1px solid rgba(240, 246, 252, 0.1);
-      border-radius: 6px;
-      appearance: none;
-      text-decoration: none;
-      transition: background-color 0.2s, border-color 0.2s;
-    }
-    .btn-primary {
-      color: #ffffff;
-      background-color: var(--primary);
-    }
-    .btn-primary:hover {
-      background-color: var(--primary-hover);
-    }
-    .btn-primary:disabled {
-      background-color: rgba(46, 164, 79, 0.6);
-      cursor: not-allowed;
-    }
-    .btn-secondary {
-      color: var(--text);
-      background-color: var(--secondary);
-      border-color: var(--border);
-    }
-    .btn-secondary:hover {
-      background-color: var(--secondary-hover);
-      border-color: #8b949e;
-    }
-    .btn-secondary:disabled {
-      background-color: rgba(33, 38, 45, 0.6);
-      cursor: not-allowed;
-    }
-    .btn-danger {
-      color: #ffffff;
-      background-color: var(--danger);
-    }
-    .btn-danger:hover {
-      background-color: #b82522;
-    }
-    .btn-danger:disabled {
-      background-color: rgba(218, 54, 51, 0.6);
-      cursor: not-allowed;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 16px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 12px;
-      font-size: 0.88rem;
-    }
-    th, td {
-      border: 1px solid var(--border);
-      padding: 8px 12px;
-      text-align: left;
-    }
-    th {
-      background-color: rgba(255, 255, 255, 0.05);
-      font-weight: 600;
-    }
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 2px 8px;
-      font-size: 0.75rem;
-      font-weight: 500;
-      border-radius: 2em;
-    }
-    .badge-success {
-      background-color: rgba(46, 164, 79, 0.15);
-      color: #3fb950;
-      border: 1px solid rgba(46, 164, 79, 0.4);
-    }
-    .badge-fail {
-      background-color: rgba(218, 54, 51, 0.15);
-      color: #f85149;
-      border: 1px solid rgba(218, 54, 51, 0.4);
-    }
-    .badge-warn {
-      background-color: rgba(212, 167, 44, 0.15);
-      color: #d4a72c;
-      border: 1px solid rgba(212, 167, 44, 0.4);
-    }
-    .conn-status {
-      padding: 12px;
-      border-radius: 6px;
-      font-size: 0.88rem;
-      margin-bottom: 16px;
-      font-weight: 500;
-    }
-    .conn-fail {
-      background-color: rgba(218, 54, 51, 0.1);
-      border: 1px solid rgba(218, 54, 51, 0.2);
-      color: #f85149;
-    }
-    .conn-success {
-      background-color: rgba(46, 164, 79, 0.1);
-      border: 1px solid rgba(46, 164, 79, 0.2);
-      color: #3fb950;
-    }
-    .logs-container {
-      max-height: 200px;
-      overflow-y: auto;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      background-color: rgba(0, 0, 0, 0.2);
-      padding: 12px;
-      font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
-      font-size: 0.81rem;
-    }
-    .log-line {
-      margin-bottom: 6px;
-      border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
-      padding-bottom: 4px;
-    }
-    .log-time {
-      color: var(--text-muted);
-      margin-right: 8px;
-    }
-    .tab-nav {
+    .password-wrapper {
+      position: relative;
       display: flex;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 20px;
-      gap: 8px;
+      align-items: center;
+      width: 100%;
     }
-    .tab-btn {
+    .password-wrapper input[type="password"],
+    .password-wrapper input[type="text"] {
+      padding-right: 42px;
+    }
+    .password-toggle-btn {
+      position: absolute;
+      right: 12px;
       background: none;
       border: none;
       color: var(--text-muted);
-      padding: 8px 16px;
       cursor: pointer;
+      font-size: 1rem;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      outline: none;
+    }
+    .password-toggle-btn:hover {
+      color: var(--text);
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    button, .button {
+      background-color: var(--primary);
+      color: #ffffff;
+      border: 1px solid rgba(240, 246, 252, 0.1);
+      padding: 6px 16px;
       font-size: 0.88rem;
       font-weight: 500;
-      border-bottom: 2px solid transparent;
-      transition: color 0.2s, border-bottom-color 0.2s;
-    }
-    .tab-btn:hover {
-      color: var(--text);
-    }
-    .tab-btn.active {
-      color: var(--text);
-      border-bottom-color: var(--accent);
-    }
-    .tab-content {
-      display: none;
-    }
-    .tab-content.active {
-      display: block;
-    }
-    #maintenance-output {
-      background-color: #000;
-      color: #3fb950;
-      padding: 12px;
       border-radius: 6px;
-      font-family: monospace;
-      font-size: 0.81rem;
-      max-height: 300px;
-      overflow-y: auto;
-      white-space: pre-wrap;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      line-height: 20px;
+      text-decoration: none;
+      transition: background-color 0.2s;
+    }
+    button:hover, .button:hover {
+      background-color: var(--primary-hover);
+    }
+    button.secondary, .button.secondary {
+      background-color: var(--secondary);
+      border-color: rgba(240, 246, 252, 0.1);
+      color: var(--text);
+      padding: 5px 12px;
+    }
+    button.secondary:hover, .button.secondary:hover {
+      background-color: var(--secondary-hover);
+    }
+    button.danger, .button.danger {
+      background-color: #21262d;
+      border-color: rgba(240, 246, 252, 0.1);
+      color: #f85149;
+    }
+    button.danger:hover, .button.danger:hover {
+      background-color: #da3633;
+      color: #ffffff;
+      border-color: #f85149;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    pre {
+      background-color: #161b22;
       border: 1px solid var(--border);
-      display: none;
+      border-radius: 6px;
+      padding: 16px;
+      color: #34d399;
+      font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+      font-size: 0.82rem;
+      overflow-x: auto;
       margin-top: 12px;
+      white-space: pre-wrap;
     }
-    .help-text {
-      font-size: 0.81rem;
+    .status-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: var(--text-muted);
+    }
+    .status-text {
+      font-size: 0.88rem;
+      font-weight: 600;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      font-size: 0.82rem;
+    }
+    .info-item {
+      background-color: rgba(255, 255, 255, 0.01);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+    }
+    .info-label {
       color: var(--text-muted);
-      margin-top: 4px;
+      font-size: 0.75rem;
+      margin-bottom: 2px;
     }
-    @media (max-width: 600px) {
-      .grid { grid-template-columns: 1fr; }
+    .info-value {
+      font-weight: 600;
+      font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
     }
+    .lock-banner {
+      background-color: rgba(56, 139, 253, 0.1);
+      border: 1px dashed rgba(56, 139, 253, 0.3);
+      border-radius: 6px;
+      padding: 12px;
+      text-align: center;
+      font-size: 0.82rem;
+      color: #58a6ff;
+      margin-top: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .welcome-text {
+      font-size: 0.88rem;
+      color: #34d399;
+      font-weight: 600;
+    }
+    .conn-status {
+      font-size: 0.78rem;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+    .conn-ok { color: var(--success); }
+    .conn-fail { color: var(--danger); }
   </style>
 </head>
 <body>
-
-<main>
-  <header>
-    <h1>AI NotebookLM Cloud Portal</h1>
-    <div class="watermark">v2.01版 Falo x Force Cheng 2026/6/14</div>
-  </header>
-
-  <!-- Connection Setup Card -->
-  <div class="card">
-    <h2>🔗 Apps Script 雲端串接設定</h2>
-    <div class="field">
-      <label for="gas-url-input">Google Apps Script 部署網址 (Web App URL)</label>
-      <input type="text" id="gas-url-input" placeholder="https://script.google.com/macros/s/.../exec">
-      <p class="help-text">請貼上您在 Google 試算表延伸程式中，將 GAS 專案「部署為網頁應用程式」後產生的 Exec 網址。</p>
-    </div>
-    
-    <div class="field" style="margin-bottom: 20px;">
-      <button class="btn btn-primary" onclick="connectAndSaveGasUrl()">⚡ 儲存並進行連線驗證</button>
-    </div>
-
-    <div id="conn-status-msg" class="conn-status conn-fail" style="display:none;"></div>
-  </div>
-
-  <!-- Main Navigation Tabs -->
-  <div class="tab-nav">
-    <button class="tab-btn active" onclick="switchTab('dashboard')">📊 儀表板</button>
-    <button class="tab-btn" onclick="switchTab('hosts')">🖥️ 登記主機清單</button>
-    <button class="tab-btn" onclick="switchTab('tasks')">📋 雲端派工單 (Tasks)</button>
-    <button class="tab-btn" onclick="switchTab('system')">🛠️ 系統維護</button>
-  </div>
-
-  <!-- TAB: Dashboard -->
-  <div id="tab-dashboard" class="tab-content active">
-    <!-- Quick Status Card -->
-    <div class="grid">
-      <div class="card">
-        <h2>🖥️ 最近回報主機</h2>
-        <div class="field">
-          <label>主機名稱 (Hostname)</label>
-          <input type="text" id="dash-hostname" readonly value="-">
+  <main>
+    <!-- GUEST PORTAL VIEW (Unauthenticated View) -->
+    <div id="guest-portal-view">
+      <header>
+        <div class="brand-section">
+          <h1>AI NotebookLM Cloud Portal (訪客)</h1>
+          <div class="watermark">v2.01版 Falo x Force Cheng 2026/6/14</div>
         </div>
-        <div class="field">
-          <label>作業系統 (OS Type)</label>
-          <input type="text" id="dash-os" readonly value="-">
-        </div>
-        <div class="field">
-          <label>最後心跳時間 (Last Seen)</label>
-          <input type="text" id="dash-last-seen" readonly value="-">
-        </div>
-      </div>
+      </header>
 
-      <div class="card">
-        <h2>🌐 網路通道網址</h2>
-        <div class="field">
-          <label>地端內網網址 (LAN IP)</label>
-          <input type="text" id="dash-lan" readonly value="-">
+      <!-- URL & User Login Card -->
+      <section class="card" id="guest-header-card" style="padding: 16px;">
+        <div class="guest-top-bar" style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;">
+          <!-- GAS URL Input -->
+          <div style="flex: 2; min-width: 280px;">
+            <label for="gas-url-input" style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 6px; font-weight: 600;">🔗 雲端中控 Web App 網址 (GAS URL)</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="gas-url-input" placeholder="https://script.google.com/macros/s/.../exec" style="margin: 0; padding: 6px 12px; font-size: 0.82rem; outline: none; background-color: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); flex: 1;">
+              <button id="ping-btn" onclick="testGasConnection(this)" class="secondary" style="white-space: nowrap; padding: 6px 12px;">連線</button>
+            </div>
+          </div>
+          <!-- User Login Input -->
+          <div style="flex: 3; min-width: 380px; display: flex; gap: 8px; align-items: flex-end;">
+            <div style="flex: 1;">
+              <label for="login-user" style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 6px; font-weight: 600;">👤 帳號</label>
+              <input type="text" id="login-user" placeholder="帳號" style="margin: 0; padding: 6px 12px; font-size: 0.82rem; outline: none; background-color: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); width: 100%; box-sizing: border-box;">
+            </div>
+            <div style="flex: 1;">
+              <label for="login-pass" style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 6px; font-weight: 600;">🔑 密碼</label>
+              <div class="password-wrapper" style="margin: 0; position: relative;">
+                <input type="password" id="login-pass" placeholder="密碼" style="margin: 0; padding: 6px 12px; font-size: 0.82rem; width: 100%; box-sizing: border-box; padding-right: 32px; outline: none; background-color: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
+                <button type="button" class="password-toggle-btn" onclick="toggleTokenVisibility('login-pass', this)" title="顯示/隱藏密碼" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; padding: 0; cursor: pointer; color: var(--text-muted); font-size: 0.82rem; height: auto;">👁️</button>
+              </div>
+            </div>
+            <button onclick="submitLogin(this)" style="padding: 7px 16px; font-size: 0.82rem; white-space: nowrap; height: 32px; display: flex; align-items: center; justify-content: center;">登入</button>
+          </div>
         </div>
-        <div class="field">
-          <label>地端外網隧道 (Ngrok WAN)</label>
-          <input type="text" id="dash-wan" readonly value="-">
+        <div id="conn-status-msg" class="conn-status" style="margin-top: 8px; font-size: 0.78rem;"></div>
+        <div id="guest-sheet-url-container" style="display: none; align-items: center; gap: 8px; margin-top: 10px; font-size: 0.82rem; background: rgba(255, 255, 255, 0.05); padding: 8px 12px; border-radius: 6px; border: 1px dashed var(--border);">
+          <span style="color: var(--text-muted); font-weight: 600; white-space: nowrap;">📊 雲端中控試算表：</span>
+          <input type="text" id="guest-sheet-url-input" readonly style="background-color: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 4px 8px; font-size: 0.78rem; font-family: monospace; flex: 1; margin: 0; outline: none; height: 28px;">
+          <button id="guest-copy-sheet-btn" class="secondary" onclick="copyText('guest-sheet-url-input', 'guest-copy-sheet-btn')" style="padding: 4px 8px; font-size: 0.78rem; white-space: nowrap; height: 28px; display: flex; align-items: center; justify-content: center; margin: 0;">📋 複製</button>
+          <button id="guest-open-sheet-btn" class="secondary" onclick="window.open(document.getElementById('guest-sheet-url-input').value, '_blank')" style="padding: 4px 8px; font-size: 0.78rem; white-space: nowrap; height: 28px; display: flex; align-items: center; justify-content: center; margin: 0;">🌐 開啟</button>
         </div>
-        <div style="margin-top: 24px; display: flex; gap: 8px;">
-          <button class="btn btn-primary" style="flex: 1;" onclick="jumpToLocalPortal()">🔗 開啟地端網頁</button>
-          <button class="btn btn-secondary" onclick="refreshGuestStatus()">🔄 重新載入</button>
+        <div id="login-error-msg" style="color: var(--danger); font-weight: 600; margin-top: 8px; font-size: 0.78rem;"></div>
+        
+        <div style="background-color: rgba(46, 164, 79, 0.05); border-left: 3px solid var(--primary); border-radius: 6px; padding: 10px; font-size: 0.78rem; color: var(--text-muted); margin-top: 12px; line-height: 1.4;">
+          <strong>💡 預設測試帳密：</strong>管理員 <code>admin</code> | 特權 <code>power</code> | 一般 <code>user</code> (密碼皆為 <code>123456</code>)
         </div>
-      </div>
+      </section>
+
+      <!-- Guest Host Status Card -->
+      <section class="card" id="guest-status-card" style="display: none;">
+        <h2>地端主機狀態 (Host Info)</h2>
+        <div class="status-container" style="margin-bottom: 16px;">
+          <div class="guest-status-dot" id="guest-status-dot" style="width: 10px; height: 10px; border-radius: 50%; background-color: var(--text-muted); display: inline-block; margin-right: 8px;"></div>
+          <div class="status-text" id="guest-status-text" style="display: inline-block; vertical-align: middle;">偵測中...</div>
+        </div>
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="info-label">主機名稱</div>
+            <div class="info-value" id="guest-host-name">-</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">作業系統</div>
+            <div class="info-value" id="guest-host-os">-</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">最後回報</div>
+            <div class="info-value" id="guest-host-last-seen">-</div>
+          </div>
+        </div>
+        <div class="field" style="margin-top: 16px;">
+          <label style="display: block; font-size: 0.82rem; color: var(--text-muted); margin-bottom: 6px;">地端內網網址 (LAN IP)</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="guest-host-lan-url" readonly style="background-color: var(--bg); outline: none; border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 6px 12px; font-size: 0.82rem; font-family: monospace; flex: 1;">
+            <button id="guest-copy-lan-btn" onclick="copyText('guest-host-lan-url', 'guest-copy-lan-btn')">📋 複製</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Guest Logs Card -->
+      <section class="card" id="guest-logs-card" style="display: none;">
+        <h2>最新 5 筆地端上報日誌 (Last 5 Heartbeats)</h2>
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left; background-color: rgba(0,0,0,0.1); border-radius: 6px; overflow: hidden; border: 1px solid var(--border);">
+            <thead>
+              <tr style="background-color: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border);">
+                <th style="padding: 10px; color: var(--text); cursor: pointer;" onclick="sortGuestLogsTable('timestamp')">時間<span id="sort-guest-timestamp"></span></th>
+                <th style="padding: 10px; color: var(--text); cursor: pointer;" onclick="sortGuestLogsTable('hostname')">主機名稱<span id="sort-guest-hostname"></span></th>
+                <th style="padding: 10px; color: var(--text); cursor: pointer;" onclick="sortGuestLogsTable('os_type')">系統<span id="sort-guest-os_type"></span></th>
+                <th style="padding: 10px; color: var(--text); cursor: pointer;" onclick="sortGuestLogsTable('lan_url')">地端內網網址 (LAN IP)<span id="sort-guest-lan_url"></span></th>
+              </tr>
+            </thead>
+            <tbody id="guest-logs-table-body">
+              <tr>
+                <td colspan="4" style="padding: 15px; text-align: center; color: var(--text-muted);">無日誌資料</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
 
-    <!-- Recent Logs Card -->
-    <div class="card" style="margin-top: 16px;">
-      <h2>📋 最近 5 筆地端上報日誌</h2>
-      <div class="logs-container" id="dash-logs-container">
-        <div class="log-line" style="color: var(--text-muted); text-align: center;">尚未載入日誌資料...</div>
+    <!-- AUTHENTICATED PORTAL VIEW (Dashboard View) -->
+    <div id="auth-portal-view" style="display: none;">
+      <header>
+        <div class="brand-section">
+          <h1>AI NotebookLM Cloud Portal (主控面版)</h1>
+          <div class="watermark">v2.01版 Falo x Force Cheng 2026/6/14</div>
+        </div>
+        <div id="user-info-section" style="display: flex;">
+          <span class="welcome-text" id="welcome-msg"></span>
+          <button class="secondary" style="padding: 4px 12px; font-size: 0.82rem; margin-left: 8px;" onclick="logout()">登出</button>
+        </div>
+      </header>
+
+      <!-- Card 1: Host Status (Auth version) -->
+      <section class="card" id="status-card" style="display: none;">
+        <h2>地端主機狀態 (Host IP & Status)</h2>
+        <div class="status-container">
+          <div class="status-dot" id="status-dot"></div>
+          <div class="status-text" id="status-text">偵測中...</div>
+        </div>
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="info-label">主機名稱</div>
+            <div class="info-value" id="host-name">-</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">作業系統</div>
+            <div class="info-value" id="host-os">-</div>
+          </div>
+          <div class="info-item private-field" style="display: none;">
+            <div class="info-label">更新方式</div>
+            <div class="info-value" id="host-method">-</div>
+          </div>
+          <div class="info-item private-field" style="display: none;">
+            <div class="info-label">最後回報時間</div>
+            <div class="info-value" id="host-last-seen">-</div>
+          </div>
+        </div>
+        
+        <!-- IP and ngrok Grouped Container -->
+        <div class="connections-group" style="background-color: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 6px; padding: 16px; margin-top: 20px;">
+          <h3 style="font-size: 0.88rem; font-weight: 600; margin-top: 0; margin-bottom: 12px; color: var(--accent); display: flex; align-items: center; gap: 6px;">
+            🖥️ 主機連線通道 (Host Connection Channels)
+          </h3>
+          
+          <div class="field">
+            <label>地端內網連線 (LAN IP)</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="host-lan-url" readonly style="background-color: var(--bg);">
+              <button id="copy-lan-btn" onclick="copyText('host-lan-url', 'copy-lan-btn')">📋 複製</button>
+            </div>
+          </div>
+
+          <div class="field" id="host-wan-wrapper" style="display: none; margin-top: 12px;">
+            <label>地端外網連線 (WAN / ngrok)</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="host-wan-url" readonly style="background-color: var(--bg);">
+              <button id="copy-wan-btn" onclick="copyText('host-wan-url', 'copy-wan-btn')">📋 複製</button>
+            </div>
+          </div>
+
+          <div class="conn-tip" style="background-color: rgba(46, 164, 79, 0.08); border-left: 3px solid var(--primary); padding: 10px; border-radius: 4px; font-size: 0.78rem; color: var(--text); margin-top: 12px; line-height: 1.4;">
+            💡 <strong>連線建議：</strong>若您的裝置與地端主機在同一個局域網路（區網）環境下，請<strong>優先選擇使用「內網 IP」</strong>進行連線。如此可獲得最佳傳輸效率與反應速度，並能節省 ngrok 外網免費流量。
+          </div>
+        </div>
+
+        <div class="lock-banner" id="lock-banner">
+          🔒 登入後解鎖詳細上報頻率、最後回報時間與外網通道網址。
+        </div>
+      </section>
+
+      <!-- Card 1.5: Last 5 logs (Always visible, WAN column hidden for guests) -->
+      <section class="card" id="logs-card" style="display: none;">
+        <h2>最新 5 筆地端上報日誌 (Last 5 Heartbeats)</h2>
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left; background-color: rgba(0,0,0,0.1); border-radius: 6px; overflow: hidden; border: 1px solid var(--border);">
+            <thead>
+              <tr style="background-color: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border);">
+                <th style="padding: 10px; color: var(--text); cursor: pointer;" onclick="sortAuthLogsTable('timestamp')">時間<span id="sort-auth-timestamp"></span></th>
+                <th style="padding: 10px; color: var(--text); cursor: pointer;" onclick="sortAuthLogsTable('hostname')">主機名稱<span id="sort-auth-hostname"></span></th>
+                <th style="padding: 10px; color: var(--text); cursor: pointer;" onclick="sortAuthLogsTable('os_type')">系統<span id="sort-auth-os_type"></span></th>
+                <th style="padding: 10px; color: var(--text); cursor: pointer;" onclick="sortAuthLogsTable('lan_url')">地端內網網址 (LAN IP)<span id="sort-auth-lan_url"></span></th>
+                <th style="padding: 10px; color: var(--text); display: none; cursor: pointer;" id="logs-table-wan-header" onclick="sortAuthLogsTable('wan_url')">外網網址 (WAN / ngrok)<span id="sort-auth-wan_url"></span></th>
+              </tr>
+            </thead>
+            <tbody id="logs-table-body">
+              <tr>
+                <td colspan="4" style="padding: 15px; text-align: center; color: var(--text-muted);">無日誌資料</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Wrapper 3: Main Content (Visible to Logged-in Users) -->
+      <div id="main-content-wrapper" style="display: none;">
+        <!-- Workstation Settings Card (Admin Only Card) -->
+        <section class="card admin-only-card" style="display: none;">
+          <h2>喚醒地端伺服器設定 (Workstation Settings)</h2>
+          <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 0; margin-bottom: 16px;">設定本機/區網或 ngrok 轉發網址，雲端可在此直接儲存工作站 URL。</p>
+          
+          <div class="field">
+            <label>工作站路由模式 (Routing Mode)</label>
+            <div style="display: flex; gap: 16px; align-items: center; margin-top: 8px; flex-wrap: wrap;">
+              <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-weight: normal;">
+                <input type="radio" name="routing-mode" value="latest" checked onchange="toggleRoutingModeDisplay()"> 🔄 自動使用最新連線
+              </label>
+              <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-weight: normal;">
+                <input type="radio" name="routing-mode" value="manual" onchange="toggleRoutingModeDisplay()"> 🔒 手動鎖定指定主機
+              </label>
+            </div>
+          </div>
+
+          <div class="field" id="manual-host-selector-wrapper" style="display: none;">
+            <label for="manual-host-select">指定工作站主機 (Designated Host)</label>
+            <select id="manual-host-select">
+              <option value="">載入中...</option>
+            </select>
+          </div>
+
+          <div class="field" id="workstation-url-input-wrapper">
+            <label for="workstation-url">目前作用中的工作站 URL (Workstation URL)</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="workstation-url" placeholder="https://your-ngrok.ngrok-free.dev 或 http://192.168.x.x:8765">
+              <button id="copy-ws-url-btn" onclick="copyText('workstation-url', 'copy-ws-url-btn')" class="secondary" style="white-space: nowrap;">📋 複製</button>
+            </div>
+          </div>
+          
+          <div class="btn-group">
+            <button onclick="saveWorkstationUrl(this)">💾 儲存工作站網址</button>
+            <button class="secondary" id="save-routing-btn" onclick="saveRoutingConfig(this)" style="display: none;">🔒 儲存路由設定</button>
+          </div>
+          <pre id="workstation-output" style="display: none;"></pre>
+        </section>
+
+        <!-- Diagnostics Card -->
+        <section class="card admin-only-card" style="display: none;">
+          <h2>連線測試與診斷 (Diagnostics)</h2>
+          
+          <div class="field">
+            <label for="api-token">系統 API 金鑰 (API Token)</label>
+            <div class="password-wrapper">
+              <input type="password" id="api-token" placeholder="請輸入 API 金鑰">
+              <button type="button" class="password-toggle-btn" onclick="toggleTokenVisibility('api-token', this)" title="顯示/隱藏密碼">👁️</button>
+            </div>
+          </div>
+          <div class="btn-group">
+            <button onclick="testConnection(this)">⚡ 測試金鑰連線</button>
+            <button class="secondary" onclick="refreshStatus(this)">🔄 重新整理狀態</button>
+          </div>
+          <pre id="diagnostic-output" style="display: none;"></pre>
+        </section>
+
+        <!-- Registered Hosts Card (Visible to All Logged-in Users) -->
+        <section class="card auth-only-card" id="registered-hosts-card" style="display: none;">
+          <h2>已登記的地端主機列表 (Registered Hosts)</h2>
+          <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 0; margin-bottom: 16px;">所有曾上報的地端主機清單，可點選各欄位進行排序。</p>
+          <div class="field">
+            <div style="overflow-x: auto;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left; background-color: rgba(0,0,0,0.1); border-radius: 6px; overflow: hidden; border: 1px solid var(--border);">
+                <thead>
+                  <tr style="background-color: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border);">
+                    <th style="padding: 10px; color: var(--text); cursor: pointer;" onclick="sortHostsTable('hostname')">主機名稱<span id="sort-hostname"></span></th>
+                    <th style="padding: 10px; color: var(--text); cursor: pointer;" onclick="sortHostsTable('os_type')">系統<span id="sort-os_type"></span></th>
+                    <th style="padding: 10px; color: var(--text); cursor: pointer;" onclick="sortHostsTable('lan_url')">內網網址 (LAN IP)<span id="sort-lan_url"></span></th>
+                    <th style="padding: 10px; color: var(--text); cursor: pointer;" onclick="sortHostsTable('wan_url')">外網網址 (WAN / ngrok)<span id="sort-wan_url"></span></th>
+                    <th style="padding: 10px; color: var(--text); cursor: pointer;" onclick="sortHostsTable('last_seen_at')">最後上報時間<span id="sort-last_seen_at"></span></th>
+                  </tr>
+                </thead>
+                <tbody id="hosts-list-table-body">
+                  <tr>
+                    <td colspan="5" style="padding: 15px; text-align: center; color: var(--text-muted);">載入中...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- System Maintenance Card (Admin Only Card) -->
+        <section class="card admin-only-card" id="admin-maintenance-card" style="display: none;">
+          <h2>系統維護與雲端試算表 (System Maintenance)</h2>
+          
+          <div class="field">
+            <label>已連結的雲端 Google 試算表 (Connected Spreadsheet)</label>
+            <div style="margin-top: 8px;">
+              <a id="spreadsheet-url-btn" href="#" target="_blank" class="button secondary" style="border: 1px solid var(--border); padding: 8px 16px; border-radius: 6px; font-size: 0.88rem; display: none;">
+                📊 開啟雲端試算表 (Open Connected Google Sheet)
+              </a>
+            </div>
+          </div>
+
+          <div class="field" style="margin-top: 24px;">
+            <label>系統設定備份與清理 (System Backup & Maintenance)</label>
+            <div class="btn-group" style="margin-top: 8px;">
+              <button class="secondary" onclick="exportSystemSettings(this)">📥 匯出設定備份</button>
+              <button class="secondary" onclick="triggerImportFileInput()">📤 匯入設定還原</button>
+              <button class="danger" onclick="clearHostHistoryAndLogs(this)">🧹 清除主機與日誌</button>
+            </div>
+            <input type="file" id="system-import-file-input" accept=".json" style="display: none;" onchange="handleImportFileSelect(event)">
+            <pre id="maintenance-output" style="display: none;"></pre>
+          </div>
+        </section>
       </div>
     </div>
-  </div>
+  </main>
 
-  <!-- TAB: Hosts -->
-  <div id="tab-hosts" class="tab-content">
-    <div class="card">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-        <h2 style="margin: 0; border: none; padding: 0;">🖥️ 地端主機連線清單 (Hosts)</h2>
-        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="fetchAdminHostsData()">🔄 刷新列表</button>
-      </div>
-      <p class="help-text" style="margin-bottom: 16px;">此列表顯示所有曾向雲端登記的地端實體機器。當主機多於一部時，請在維護分頁切換主路由通道。</p>
-      
-      <div style="overflow-x: auto;">
-        <table id="hosts-table">
-          <thead>
-            <tr>
-              <th>主機名稱</th>
-              <th>內網 IP</th>
-              <th>外網隧道 (WAN)</th>
-              <th>系統環境</th>
-              <th>上報方式</th>
-              <th>最後心跳</th>
-            </tr>
-          </thead>
-          <tbody id="hosts-table-body">
-            <tr>
-              <td colspan="6" style="text-align: center; color: var(--text-muted);">請先完成連線驗證並刷新列表。</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
+  <script>
+    let hostState = {
+      lanUrl: '',
+      wanUrl: '',
+      hostname: '',
+      osType: '',
+      method: '',
+      interval: '',
+      lastSeen: '',
+      workstationUrl: '',
+      routingMode: 'latest',
+      manualHost: '',
+      spreadsheetUrl: ''
+    };
 
-  <!-- TAB: Tasks -->
-  <div id="tab-tasks" class="tab-content">
-    <div class="card">
-      <h2>📋 雲端試算表派工單 (Sheet Tasks)</h2>
-      <p class="help-text">這裡顯示登記在雲端試算表「任務派工單」的工作。當本機 Runtime 進行輪詢時，會自動拉取這些任務並排程執行。</p>
-      <div style="margin-bottom: 16px; display: flex; gap: 8px;">
-        <input type="password" id="admin-token-input" placeholder="🔑 請輸入管理員密鑰進行進階管理 (如有設定)" style="flex: 1;">
-        <button class="btn btn-secondary" onclick="fetchTasksData()">🔄 讀取雲端任務</button>
-      </div>
+    let registeredHosts = [];
+    let sortState = {
+      key: 'last_seen_at',
+      asc: false
+    };
 
-      <div style="overflow-x: auto;">
-        <table>
-          <thead>
-            <tr>
-              <th>任務 ID</th>
-              <th>種類</th>
-              <th>發起人</th>
-              <th>狀態</th>
-              <th>目標 Notebook ID</th>
-              <th>備註 / 進度</th>
-              <th>時間</th>
-            </tr>
-          </thead>
-          <tbody id="tasks-table-body">
-            <tr>
-              <td colspan="7" style="text-align: center; color: var(--text-muted);">請先點選「讀取雲端任務」載入資料。</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- TAB: System Maintenance -->
-  <div id="tab-system" class="tab-content">
-    <div class="card">
-      <h2>🛠️ 雲端維護與進階操作</h2>
-      
-      <div class="field">
-        <label>1. 地端主機路由選擇模式 (Workstation Routing Mode)</label>
-        <select id="routing-mode-select">
-          <option value="latest">自動指向最新回報主機 (Latest Connected)</option>
-          <option value="static">靜態鎖定指定主機 (Static Lock)</option>
-        </select>
-        <p class="help-text">Latest 模式適合單人實驗。若有多名學員共用同個雲端且各自回報，請改為 Static 模式並指定您的主機，避免 Ngrok 網址不斷被他人覆蓋。</p>
-      </div>
-
-      <div class="field" style="margin-bottom: 24px;">
-        <button class="btn btn-primary" onclick="saveRoutingMode(this)">💾 儲存路由設定</button>
-      </div>
-
-      <h2>📦 設定檔備份與清除 (閉環備份)</h2>
-      <p class="help-text" style="margin-bottom: 16px;">為了符合軟體安全與資料復原教案要求，您可以將雲端中控的所有同仁帳戶與試算表參數進行封包導出，或重新導入還原。</p>
-      
-      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button class="btn btn-secondary" onclick="exportSystemSettings(this)">📥 匯出設定備份 (.json)</button>
-        <button class="btn btn-secondary" onclick="triggerImportFileInput()">📤 匯入設定還原</button>
-        <button class="btn btn-danger" onclick="clearHostHistoryAndLogs(this)">🧹 清除主機與日誌</button>
-        <input type="file" id="system-import-file-input" accept=".json" style="display: none;" onchange="handleImportFileSelect(event)">
-      </div>
-
-      <div id="maintenance-output"></div>
-    </div>
-  </div>
-</main>
-
-<script>
-    // --- Global Configuration & State ---
-    let activeTab = 'dashboard';
-    let auditLogs = [];
-
-    function switchTab(tabId) {
-      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-      
-      // Find the button
-      const clickedBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn => btn.innerText.includes(tabId === 'dashboard' ? '儀表板' : tabId === 'hosts' ? '主機' : tabId === 'tasks' ? '派工單' : '維護'));
-      if (clickedBtn) clickedBtn.classList.add('active');
-
-      const targetContent = document.getElementById('tab-' + tabId);
-      if (targetContent) targetContent.classList.add('active');
-      activeTab = tabId;
-    }
-
-    function getGasUrl() {
-      const url = document.getElementById('gas-url-input').value.trim();
-      return url;
-    }
+    let guestHeartbeats = [];
+    let authHeartbeats = [];
+    let guestLogSortState = { key: 'timestamp', asc: false };
+    let authLogSortState = { key: 'timestamp', asc: false };
 
     function getApiToken() {
-      return document.getElementById('admin-token-input').value.trim() || '123456';
+      return document.getElementById('api-token').value.trim();
     }
 
-    async function callGasApi(action, payload = {}) {
-      const gasUrl = getGasUrl();
-      if (!gasUrl) {
-        throw new Error('未設定 Google Apps Script Web App 網址！');
-      }
-      
-      const response = await fetch(gasUrl, {
-        method: 'POST',
-        mode: 'cors',
-        headers: {
-          'Content-Type': 'text/plain' // Using text/plain to avoid CORS preflight options issues in GAS
-        },
-        body: JSON.stringify({
-          action: action,
-          ...payload
-        })
+    function setBtnState(btn, loading, label) {
+      if (!btn) return;
+      btn.disabled = loading;
+      if (label) btn.innerText = label;
+    }
+
+    function copyText(elementId, buttonId) {
+      const urlInput = document.getElementById(elementId);
+      if (!urlInput || !urlInput.value) return;
+      navigator.clipboard.writeText(urlInput.value).then(() => {
+        const copyBtn = document.getElementById(buttonId);
+        const originalText = copyBtn.innerText;
+        copyBtn.innerText = '✅ 已複製';
+        setTimeout(() => { copyBtn.innerText = originalText; }, 2000);
       });
-      
-      if (!response.ok) {
-        throw new Error('HTTP 錯誤，狀態碼：' + response.status);
-      }
-      return await response.json();
     }
 
-    // --- Actions ---
-    async function connectAndSaveGasUrl() {
-      const gasUrl = getGasUrl();
-      const statusEl = document.getElementById('conn-status-msg');
-      statusEl.style.display = 'block';
-      statusEl.textContent = '正在驗證雲端連線中...';
-      statusEl.className = 'conn-status';
+    function copyTextDirect(text, btn) {
+      if (!text || text === '-' || text === '••••••') return;
+      navigator.clipboard.writeText(text).then(() => {
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '✅';
+        setTimeout(() => { btn.innerHTML = originalText; }, 1500);
+      });
+    }
 
-      if (!gasUrl) {
-        statusEl.textContent = '❌ 請先輸入 Google Apps Script 網址！';
-        statusEl.className = 'conn-status conn-fail';
-        return;
+    function toggleRoutingModeDisplay() {
+      const selectedMode = document.querySelector('input[name="routing-mode"]:checked').value;
+      const selectorWrapper = document.getElementById('manual-host-selector-wrapper');
+      const saveRoutingBtn = document.getElementById('save-routing-btn');
+      
+      if (selectedMode === 'manual') {
+        selectorWrapper.style.display = 'block';
+        saveRoutingBtn.style.display = 'inline-flex';
+      } else {
+        selectorWrapper.style.display = 'none';
+        saveRoutingBtn.style.display = 'none';
       }
+    }
 
+    function toggleTokenVisibility(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '🙈';
+      } else {
+        input.type = 'password';
+        btn.textContent = '👁️';
+      }
+    }
+
+    // Force date formatting to Taiwan/Taipei (GMT+8) Time
+    function formatTaipeiTime(dateStr) {
+      if (!dateStr || dateStr === '-') return '-';
       try {
-        const data = await callGasApi('cloud_status');
+        let d = new Date(dateStr);
+        if (isNaN(d.getTime())) {
+          d = new Date(dateStr.replace(/-/g, '/'));
+        }
+        if (isNaN(d.getTime())) return dateStr;
+        
+        const formatter = new Intl.DateTimeFormat('zh-TW', {
+          timeZone: 'Asia/Taipei',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        });
+        
+        const parts = formatter.formatToParts(d);
+        const v = {};
+        parts.forEach(p => { v[p.type] = p.value; });
+        return `${v.year}-${v.month}-${v.day} ${v.hour}:${v.minute}:${v.second}`;
+      } catch(e) {
+        return dateStr;
+      }
+    }
+
+    function parseDateForSort(val) {
+      if (!val) return 0;
+      let d = new Date(val);
+      if (isNaN(d.getTime()) && typeof val === 'string') {
+        d = new Date(val.replace(/-/g, '/'));
+      }
+      return isNaN(d.getTime()) ? 0 : d.getTime();
+    }
+
+    // CORS-safe fetch helper for GAS
+    async function callGasApi(action, payload = {}, useGet = false) {
+      const gasUrl = document.getElementById('gas-url-input').value.trim();
+      if (!gasUrl) {
+        throw new Error('請先設定雲端中控 GAS URL！');
+      }
+      
+      const reqPayload = { action, ...payload };
+      
+      if (useGet) {
+        const query = new URLSearchParams(reqPayload).toString();
+        const res = await fetch(`${gasUrl}?${query}`);
+        if (!res.ok) throw new Error(`HTTP 錯誤: ${res.status}`);
+        return await res.json();
+      } else {
+        // Send as text/plain to bypass OPTIONS preflight
+        const res = await fetch(gasUrl, {
+          method: 'POST',
+          mode: 'cors',
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8'
+          },
+          body: JSON.stringify(reqPayload)
+        });
+        if (!res.ok) throw new Error(`HTTP 錯誤: ${res.status}`);
+        return await res.json();
+      }
+    }
+
+    async function testGasConnection(btn) {
+      setBtnState(btn, true, '連線中...');
+      const msgEl = document.getElementById('conn-status-msg');
+      if (msgEl) {
+        msgEl.textContent = '';
+        msgEl.className = 'conn-status';
+      }
+      const sheetContainer = document.getElementById('guest-sheet-url-container');
+      if (sheetContainer) {
+        sheetContainer.style.display = 'none';
+      }
+      
+      try {
+        const data = await callGasApi('ping', {}, true);
         if (data && data.ok) {
+          if (msgEl) {
+            msgEl.textContent = '🟢 連線成功！雲端中控回傳正常。';
+            msgEl.className = 'conn-status conn-ok';
+          }
+          if (data.spreadsheet_url && sheetContainer) {
+            document.getElementById('guest-sheet-url-input').value = data.spreadsheet_url;
+            sheetContainer.style.display = 'flex';
+          }
+          const gasUrl = document.getElementById('gas-url-input').value.trim();
           localStorage.setItem('falo_gas_url', gasUrl);
-          statusEl.textContent = '🟢 連線成功！Apps Script 回傳正常。已為此瀏覽器記住連線網址。';
-          statusEl.className = 'conn-status conn-success';
-          refreshDashboardWithData(data);
+          
+          await refreshGuestStatus();
         } else {
-          statusEl.textContent = '❌ 雲端回傳錯誤：' + (data ? data.error : '未知錯誤');
-          statusEl.className = 'conn-status conn-fail';
+          if (msgEl) {
+            msgEl.textContent = '🔴 連線失敗：雲端回傳資料有誤。';
+            msgEl.className = 'conn-status conn-fail';
+          }
         }
       } catch (err) {
-        statusEl.textContent = '❌ 連線驗證失敗：' + err.message + ' (請確認 GAS 是否已部署為「任何人」均可存取)';
-        statusEl.className = 'conn-status conn-fail';
+        console.error(err);
+        if (msgEl) {
+          msgEl.textContent = '🔴 連線錯誤：無法連線至指定的 GAS URL (' + err.message + ')。請確認該網址是否已發布為「任何人」可存取。';
+          msgEl.className = 'conn-status conn-fail';
+        }
+      } finally {
+        setBtnState(btn, false, '連線');
       }
+    }
+
+    function switchView(isLoggedIn) {
+      document.getElementById('guest-portal-view').style.display = isLoggedIn ? 'none' : 'block';
+      document.getElementById('auth-portal-view').style.display = isLoggedIn ? 'block' : 'none';
+    }
+
+    function renderGuestHostStatus() {
+      const dot = document.getElementById('guest-status-dot');
+      const text = document.getElementById('guest-status-text');
+      const nameEl = document.getElementById('guest-host-name');
+      const osEl = document.getElementById('guest-host-os');
+      const lastSeenEl = document.getElementById('guest-host-last-seen');
+      const lanUrlEl = document.getElementById('guest-host-lan-url');
+      const copyLanBtn = document.getElementById('guest-copy-lan-btn');
+
+      if (!dot || !text || !nameEl || !osEl || !lastSeenEl || !lanUrlEl || !copyLanBtn) return;
+
+      try {
+        lanUrlEl.value = hostState.lanUrl || '-';
+
+        if (!hostState.lastSeen) {
+          dot.style.backgroundColor = '#da3633';
+          text.textContent = '🔴 地端主機未上報連線資訊';
+          nameEl.textContent = '無資料';
+          osEl.textContent = '無資料';
+          lastSeenEl.textContent = '無資料';
+          return;
+        }
+
+        let lastSeenDate = new Date(hostState.lastSeen);
+        if (isNaN(lastSeenDate.getTime())) {
+          lastSeenDate = new Date(hostState.lastSeen.replace(/-/g, '/'));
+        }
+
+        const now = new Date();
+        const diffMs = now - lastSeenDate;
+        const diffMins = Math.floor(diffMs / 1000 / 60);
+
+        const intervalSec = parseInt(hostState.interval) || 300;
+        const thresholdMins = Math.max(10, Math.ceil((intervalSec * 2.5) / 60));
+
+        const isOnline = !isNaN(diffMs) && (diffMins < thresholdMins);
+
+        nameEl.textContent = hostState.hostname || '未知主機';
+        osEl.textContent = hostState.osType || '未知系統';
+        lastSeenEl.textContent = formatTaipeiTime(hostState.lastSeen) + ' (' + (isNaN(diffMins) ? '未知' : (diffMins === 0 ? '剛剛' : diffMins + ' 分鐘前')) + ')';
+
+        if (isOnline) {
+          dot.style.backgroundColor = '#2ea44f';
+          text.textContent = '🟢 地端主機連線正常';
+        } else {
+          dot.style.backgroundColor = '#da3633';
+          text.textContent = '🔴 地端主機已離線';
+        }
+      } catch (err) {
+        console.error('Error rendering guest host status:', err);
+        text.textContent = '⚠️ 狀態解析錯誤: ' + err.message;
+      }
+    }
+
+    function renderGuestLogsTableBody(logs) {
+      const tableBodyEl = document.getElementById('guest-logs-table-body');
+      if (!tableBodyEl) return;
+      tableBodyEl.innerHTML = '';
+      
+      if (!logs || logs.length === 0) {
+        tableBodyEl.innerHTML = `<tr><td colspan="4" style="padding: 15px; text-align: center; color: var(--text-muted);">無日誌資料</td></tr>`;
+        return;
+      }
+      
+      logs.forEach(l => {
+        const row = document.createElement('tr');
+        row.style.borderBottom = '1px solid var(--border)';
+        
+        const lanHtml = l.lan_url ? `
+          <div style="display: inline-flex; align-items: center; gap: 4px;">
+            <a href="${l.lan_url}" target="_blank" style="color: var(--accent); text-decoration: none;">${l.lan_url}</a>
+            <button class="secondary" style="padding: 1px 4px; font-size: 0.68rem;" onclick="copyTextDirect('${l.lan_url}', this)">📋</button>
+          </div>
+        ` : '-';
+        
+        const timeStr = formatTaipeiTime(l.timestamp || l.local_time);
+
+        row.innerHTML = `
+          <td style="padding: 10px;">${timeStr}</td>
+          <td style="padding: 10px; font-weight: 600;">${l.hostname}</td>
+          <td style="padding: 10px;">${l.os_type || '-'}</td>
+          <td style="padding: 10px;">${lanHtml}</td>
+        `;
+        tableBodyEl.appendChild(row);
+      });
+
+      // Update sort indicators
+      const keys = ['timestamp', 'hostname', 'os_type', 'lan_url'];
+      keys.forEach(k => {
+        const indicator = document.getElementById(`sort-guest-${k}`);
+        if (indicator) {
+          if (k === guestLogSortState.key) {
+            indicator.textContent = guestLogSortState.asc ? ' ▲' : ' ▼';
+            indicator.style.color = 'var(--accent)';
+          } else {
+            indicator.textContent = '';
+            indicator.style.color = '';
+          }
+        }
+      });
     }
 
     async function refreshGuestStatus() {
       try {
-        const data = await callGasApi('cloud_status');
+        const data = await callGasApi('cloud_status', {}, true);
         if (data && data.ok) {
-          refreshDashboardWithData(data);
+          hostState.lanUrl = data.reported_lan_url || '';
+          hostState.hostname = data.reported_hostname || '';
+          hostState.osType = data.reported_os_type || '';
+          hostState.interval = data.reported_interval || '';
+          hostState.lastSeen = data.reported_last_seen || '';
+          
+          document.getElementById('guest-status-card').style.display = 'block';
+          document.getElementById('guest-logs-card').style.display = 'block';
+          
+          renderGuestHostStatus();
+          guestHeartbeats = data.guest_logs || [];
+          guestLogSortState.key = '';
+          renderGuestLogsTableBody(guestHeartbeats);
+          
+          let auth = null;
+          try {
+            const session = sessionStorage.getItem('falo_auth');
+            if (session) auth = JSON.parse(session);
+          } catch(e){}
+          
+          if (auth) {
+            switchView(true);
+            refreshStatusSilent(auth.token);
+          } else {
+            switchView(false);
+          }
         }
       } catch (err) {
-        console.error('Failed to refresh status:', err);
+        console.error('Failed to fetch guest status:', err);
       }
     }
 
-    function refreshDashboardWithData(data) {
-      const settings = data.settings || {};
+    function renderLogsTableBody(logs, role) {
+      const tableBodyEl = document.getElementById('logs-table-body');
+      const wanHeader = document.getElementById('logs-table-wan-header');
+      if (!tableBodyEl || !wanHeader) return;
+      tableBodyEl.innerHTML = '';
       
-      document.getElementById('dash-hostname').value = settings.runtime_hostname || '無資料';
-      document.getElementById('dash-os').value = settings.runtime_os_type || '無資料';
-      document.getElementById('dash-last-seen').value = settings.runtime_last_seen_at || '無資料';
-      
-      document.getElementById('dash-lan').value = settings.runtime_reported_lan_url || '無資料';
-      document.getElementById('dash-wan').value = settings.workstation_url || '無資料';
-      
-      // Update logs
-      const logsContainer = document.getElementById('dash-logs-container');
-      logsContainer.innerHTML = '';
-      const logs = data.logs || [];
-      if (logs.length === 0) {
-        logsContainer.innerHTML = '<div class="log-line" style="color: var(--text-muted); text-align: center;">無日誌上報紀錄</div>';
+      const showWan = (role && role !== 'guest');
+      if (showWan) {
+        wanHeader.style.display = 'table-cell';
       } else {
-        logs.forEach(l => {
-          const div = document.createElement('div');
-          div.className = 'log-line';
-          div.innerHTML = `<span class="log-time">[${l.timestamp || l.local_time}]</span> <b>${l.hostname}</b> (${l.os_type}) - LAN IP: <a href="${l.lan_url}" target="_blank" style="color: var(--accent);">${l.lan_url}</a>`;
-          logsContainer.appendChild(div);
-        });
+        wanHeader.style.display = 'none';
       }
       
-      // Update Routing Mode select
-      const modeSelect = document.getElementById('routing-mode-select');
-      if (modeSelect) {
-        modeSelect.value = settings.workstation_routing_mode || 'latest';
+      if (!logs || logs.length === 0) {
+        tableBodyEl.innerHTML = `<tr><td colspan="${showWan ? 5 : 4}" style="padding: 15px; text-align: center; color: var(--text-muted);">無日誌資料</td></tr>`;
+        return;
+      }
+      
+      logs.forEach(l => {
+        const row = document.createElement('tr');
+        row.style.borderBottom = '1px solid var(--border)';
+        
+        const lanHtml = l.lan_url ? `
+          <div style="display: inline-flex; align-items: center; gap: 4px;">
+            <a href="${l.lan_url}" target="_blank" style="color: var(--accent); text-decoration: none;">${l.lan_url}</a>
+            <button class="secondary" style="padding: 1px 4px; font-size: 0.68rem;" onclick="copyTextDirect('${l.lan_url}', this)">📋</button>
+          </div>
+        ` : '-';
+        
+        const wanHtml = l.wan_url ? `
+          <div style="display: inline-flex; align-items: center; gap: 4px;">
+            ${l.wan_url === '••••••' ? '<span style="color: var(--text-muted);">••••••</span>' : `
+              <a href="${l.wan_url}" target="_blank" style="color: var(--accent); text-decoration: none;">${l.wan_url}</a>
+              <button class="secondary" style="padding: 1px 4px; font-size: 0.68rem;" onclick="copyTextDirect('${l.wan_url}', this)">📋</button>
+            `}
+          </div>
+        ` : '-';
+
+        const timeStr = formatTaipeiTime(l.timestamp || l.local_time);
+
+        row.innerHTML = `
+          <td style="padding: 10px;">${timeStr}</td>
+          <td style="padding: 10px; font-weight: 600;">${l.hostname}</td>
+          <td style="padding: 10px;">${l.os_type || '-'}</td>
+          <td style="padding: 10px;">${lanHtml}</td>
+          ${showWan ? `<td style="padding: 10px;">${wanHtml}</td>` : ''}
+        `;
+        tableBodyEl.appendChild(row);
+      });
+
+      // Update sort indicators
+      const keys = ['timestamp', 'hostname', 'os_type', 'lan_url', 'wan_url'];
+      keys.forEach(k => {
+        const indicator = document.getElementById(`sort-auth-${k}`);
+        if (indicator) {
+          if (k === authLogSortState.key) {
+            indicator.textContent = authLogSortState.asc ? ' ▲' : ' ▼';
+            indicator.style.color = 'var(--accent)';
+          } else {
+            indicator.textContent = '';
+            indicator.style.color = '';
+          }
+        }
+      });
+    }
+
+    function renderHostStatus(role) {
+      const dot = document.getElementById('status-dot');
+      const text = document.getElementById('status-text');
+      const nameEl = document.getElementById('host-name');
+      const osEl = document.getElementById('host-os');
+      const methodEl = document.getElementById('host-method');
+      const lastSeenEl = document.getElementById('host-last-seen');
+      const lanUrlEl = document.getElementById('host-lan-url');
+      const wanUrlEl = document.getElementById('host-wan-url');
+      const copyLanBtn = document.getElementById('copy-lan-btn');
+      const copyWanBtn = document.getElementById('copy-wan-btn');
+      const lockBanner = document.getElementById('lock-banner');
+      const privateFields = document.querySelectorAll('.private-field');
+      const wanWrapper = document.getElementById('host-wan-wrapper');
+
+      if (!dot || !text || !nameEl || !osEl || !methodEl || !lastSeenEl || !lanUrlEl || !wanUrlEl || !copyLanBtn || !copyWanBtn || !wanWrapper) return;
+
+      try {
+        if (!role || role === 'guest') {
+          lockBanner.style.display = 'flex';
+          privateFields.forEach(el => el.style.display = 'none');
+          lanUrlEl.value = hostState.lanUrl || '-';
+          wanUrlEl.value = '';
+          wanWrapper.style.display = 'none';
+          copyLanBtn.style.display = 'inline-flex';
+          copyWanBtn.style.display = 'none';
+        } else {
+          lockBanner.style.display = 'none';
+          privateFields.forEach(el => el.style.display = 'block');
+          lanUrlEl.value = hostState.lanUrl || '-';
+          wanUrlEl.value = hostState.wanUrl || '-';
+          wanWrapper.style.display = 'block';
+          copyLanBtn.style.display = 'inline-flex';
+          copyWanBtn.style.display = 'inline-flex';
+        }
+
+        if (!hostState.lastSeen) {
+          dot.style.backgroundColor = '#da3633';
+          text.textContent = '🔴 地端主機未上報連線資訊';
+          nameEl.textContent = '無資料';
+          osEl.textContent = '無資料';
+          return;
+        }
+
+        let lastSeenDate = new Date(hostState.lastSeen);
+        if (isNaN(lastSeenDate.getTime())) {
+          const formatted = hostState.lastSeen.replace(/-/g, '/');
+          lastSeenDate = new Date(formatted);
+        }
+
+        const now = new Date();
+        const diffMs = now - lastSeenDate;
+        const diffMins = Math.floor(diffMs / 1000 / 60);
+
+        const intervalSec = parseInt(hostState.interval) || 300;
+        const thresholdMins = Math.max(10, Math.ceil((intervalSec * 2.5) / 60));
+
+        const isOnline = !isNaN(diffMs) && (diffMins < thresholdMins);
+
+        nameEl.textContent = hostState.hostname || '未知主機';
+        osEl.textContent = hostState.osType || '未知系統';
+
+        if (role && role !== 'guest') {
+          let methodStr = '未知';
+          if (hostState.method === 'manual') {
+            methodStr = '👉 手動推送';
+          } else if (hostState.method === 'scheduled') {
+            methodStr = '⏱️ 自動排程 (' + Math.round(intervalSec / 60) + ' 分)';
+          }
+          methodEl.textContent = methodStr;
+          lastSeenEl.textContent = formatTaipeiTime(hostState.lastSeen) + ' (' + (isNaN(diffMins) ? '未知' : '約 ' + diffMins + ' 分鐘前') + ')';
+        }
+
+        if (isOnline) {
+          dot.style.backgroundColor = '#2ea44f';
+          text.textContent = '🟢 地端主機連線正常';
+        } else {
+          dot.style.backgroundColor = '#da3633';
+          text.textContent = '🔴 地端主機已離線或逾期';
+        }
+      } catch (err) {
+        console.error('Error rendering host status:', err);
+        text.textContent = '⚠️ 狀態解析錯誤: ' + err.message;
       }
     }
 
-    function jumpToLocalPortal() {
-      const wanUrl = document.getElementById('dash-wan').value;
-      if (wanUrl && wanUrl !== '-' && wanUrl !== '無資料') {
-        window.open(wanUrl, '_blank');
+    function showMainContent(auth) {
+      document.getElementById('main-content-wrapper').style.display = 'block';
+      document.getElementById('welcome-msg').textContent = '歡迎, ' + auth.display_name;
+      
+      document.getElementById('api-token').value = auth.token || '';
+      document.getElementById('workstation-url').value = hostState.workstationUrl || '';
+
+      const adminCards = document.querySelectorAll('.admin-only-card');
+      if (auth.role === 'admin') {
+        adminCards.forEach(el => el.style.display = 'block');
+        
+        const radioLatest = document.querySelector('input[name="routing-mode"][value="latest"]');
+        const radioManual = document.querySelector('input[name="routing-mode"][value="manual"]');
+        if (hostState.routingMode === 'manual') {
+          radioManual.checked = true;
+        } else {
+          radioLatest.checked = true;
+        }
+        toggleRoutingModeDisplay();
+        
+        if (hostState.spreadsheetUrl) {
+          const ssBtn = document.getElementById('spreadsheet-url-btn');
+          ssBtn.href = hostState.spreadsheetUrl;
+          ssBtn.style.display = 'inline-flex';
+        }
       } else {
-        const lanUrl = document.getElementById('dash-lan').value;
-        if (lanUrl && lanUrl !== '-' && lanUrl !== '無資料') {
-          window.open(lanUrl, '_blank');
-        } else {
-          alert('地端網址尚未上報，無法開啟。');
-        }
+        adminCards.forEach(el => el.style.display = 'none');
+      }
+
+      // 顯示或隱藏已登入者卡片並加載歷史主機清單
+      const authOnlyCards = document.querySelectorAll('.auth-only-card');
+      if (auth && auth.role && auth.role !== 'guest') {
+        authOnlyCards.forEach(el => el.style.display = 'block');
+        fetchAdminHostsData(auth.token);
+      } else {
+        authOnlyCards.forEach(el => el.style.display = 'none');
       }
     }
 
-    async function fetchAdminHostsData() {
-      const tbody = document.getElementById('hosts-table-body');
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;"><span class="conn-status">正在讀取雲端主機列表...</span></td></tr>';
-      
+    async function submitLogin(btn) {
+      const user = document.getElementById('login-user').value.trim();
+      const pass = document.getElementById('login-pass').value.trim();
+      const errorEl = document.getElementById('login-error-msg');
+      errorEl.textContent = '';
+
+      if (!user || !pass) {
+        errorEl.textContent = '請輸入帳號與密碼！';
+        return;
+      }
+
+      setBtnState(btn, true, '登入中...');
       try {
-        const data = await callGasApi('get_hosts_list', {
-          token: getApiToken()
-        });
-        
-        tbody.innerHTML = '';
-        if (data && data.ok && data.hosts && data.hosts.length > 0) {
-          data.hosts.forEach(h => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-              <td><b>${h.hostname}</b></td>
-              <td><code>${h.lan_url || '-'}</code></td>
-              <td><a href="${h.wan_url}" target="_blank" style="color: var(--accent);">${h.wan_url || '-'}</a></td>
-              <td>${h.os_type || '-'}</td>
-              <td>${h.report_method || '-'}</td>
-              <td style="color: var(--text-muted); font-size: 0.8rem;">${h.last_seen || '-'}</td>
-            `;
-            tbody.appendChild(tr);
-          });
+        const data = await callGasApi('login', { user_id: user, password: pass });
+        if (data && data.ok) {
+          sessionStorage.setItem('falo_auth', JSON.stringify(data));
+          switchView(true);
+          await refreshStatusSilent(data.token);
         } else {
-          tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">雲端目前無任何主機登記紀錄。</td></tr>';
+          errorEl.textContent = (data && data.error) ? data.error : '登入失敗。';
         }
       } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger);">載入失敗：${err.message}</td></tr>`;
+        console.error(err);
+        errorEl.textContent = '系統連線錯誤: ' + err.message;
+      } finally {
+        setBtnState(btn, false, '登入系統');
       }
     }
 
-    async function fetchTasksData() {
-      const tbody = document.getElementById('tasks-table-body');
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;"><span class="conn-status">正在讀取雲端派工列表...</span></td></tr>';
-      
-      try {
-        const data = await callGasApi('get_tasks_list', {
-          token: getApiToken()
-        });
-        
-        tbody.innerHTML = '';
-        if (data && data.ok && data.tasks && data.tasks.length > 0) {
-          data.tasks.forEach(t => {
-            const tr = document.createElement('tr');
-            let statusBadge = `<span class="status-badge badge-warn">排隊中</span>`;
-            if (t.status === 'success' || t.status === 'completed') {
-              statusBadge = `<span class="status-badge badge-success">完成</span>`;
-            } else if (t.status === 'failed' || t.status === 'error') {
-              statusBadge = `<span class="status-badge badge-fail">失敗</span>`;
-            } else if (t.status === 'processing') {
-              statusBadge = `<span class="status-badge badge-warn" style="background-color: rgba(88,166,255,0.15); color: var(--accent); border-color: rgba(88,166,255,0.4);">執行中</span>`;
-            }
+    function logout() {
+      sessionStorage.removeItem('falo_auth');
+      showLoginScreen();
+      renderHostStatus('guest');
+      // Refresh to hide WAN details in table
+      refreshGuestStatus();
+    }
 
-            tr.innerHTML = `
-              <td><code>${t.task_id}</code></td>
-              <td>${t.type || '-'}</td>
-              <td>${t.submitter || '-'}</td>
-              <td>${statusBadge}</td>
-              <td style="font-family: monospace; font-size: 0.8rem;">${t.target_project_id || '-'}</td>
-              <td><span style="font-size: 0.8rem; color: var(--text-muted);">${t.remark || '-'}</span></td>
-              <td style="color: var(--text-muted); font-size: 0.8rem;">${t.created_at || '-'}</td>
-            `;
-            tbody.appendChild(tr);
-          });
-        } else {
-          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">目前試算表中無派工單任務。</td></tr>';
-        }
-      } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--danger);">載入失敗：${err.message}</td></tr>`;
+    function showOutput(elId, data) {
+      const el = document.getElementById(elId);
+      if (el) {
+        el.style.display = 'block';
+        el.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
       }
     }
 
-    async function saveRoutingMode(btn) {
-      const mode = document.getElementById('routing-mode-select').value;
+    async function saveWorkstationUrl(btn) {
+      const url = document.getElementById('workstation-url').value.trim();
       setBtnState(btn, true, '儲存中...');
       try {
-        const data = await callGasApi('save_routing_mode', {
+        const data = await callGasApi('save_workstation_url', {
           token: getApiToken(),
-          routing_mode: mode
+          workstation_url: url
         });
-        if (data && data.ok) {
-          alert('路由模式設定已儲存！');
-        } else {
-          alert('儲存失敗：' + data.error);
-        }
+        showOutput('workstation-output', data);
       } catch (err) {
-        alert('儲存失敗：' + err.message);
+        showOutput('workstation-output', { ok: false, error: err.message || String(err) });
       } finally {
-        setBtnState(btn, false, '💾 儲存路由設定');
+        setBtnState(btn, false, '💾 儲存工作站網址');
       }
     }
 
-    function setBtnState(btn, loading, text) {
-      btn.disabled = loading;
-      btn.innerText = text;
+    async function testConnection(btn) {
+      setBtnState(btn, true, '測試中...');
+      try {
+        const data = await callGasApi('test_connection', {
+          token: getApiToken()
+        });
+        showOutput('diagnostic-output', data);
+      } catch (err) {
+        showOutput('diagnostic-output', { ok: false, error: err.message || String(err) });
+      } finally {
+        setBtnState(btn, false, '⚡ 測試金鑰連線');
+      }
+    }
+
+    async function refreshStatus(btn) {
+      setBtnState(btn, true, '重新整理中...');
+      try {
+        const auth = JSON.parse(sessionStorage.getItem('falo_auth'));
+        await refreshStatusSilent(auth.token);
+      } catch (err) {
+        alert('重新整理失敗: ' + err.message);
+      } finally {
+        setBtnState(btn, false, '🔄 重新整理狀態');
+      }
     }
 
     async function refreshStatusSilent(token) {
       try {
-        const data = await callGasApi('cloud_status', { token: token });
+        const data = await callGasApi('cloud_status_auth', { token });
         if (data && data.ok) {
-          refreshDashboardWithData(data);
-          const statusEl = document.getElementById('conn-status-msg');
-          statusEl.style.display = 'block';
-          statusEl.textContent = '🟢 自動從瀏覽器載入之前的 GAS 網址成功。';
-          statusEl.className = 'conn-status conn-success';
+          hostState.lanUrl = data.reported_lan_url || '';
+          hostState.wanUrl = data.reported_wan_url || '';
+          hostState.hostname = data.reported_hostname || '';
+          hostState.osType = data.reported_os_type || '';
+          hostState.method = data.reported_method || '';
+          hostState.interval = data.reported_interval || '';
+          hostState.lastSeen = data.reported_last_seen || '';
+          hostState.workstationUrl = data.workstation_url || '';
+          hostState.routingMode = data.routing_mode || 'latest';
+          hostState.manualHost = data.manual_host || '';
+          hostState.spreadsheetUrl = data.spreadsheet_url || '';
+          
+          document.getElementById('status-card').style.display = 'block';
+          document.getElementById('logs-card').style.display = 'block';
+          
+          const auth = JSON.parse(sessionStorage.getItem('falo_auth'));
+          auth.token = token;
+          sessionStorage.setItem('falo_auth', JSON.stringify(auth));
+          
+          showMainContent(auth);
+          renderHostStatus(auth.role);
+          authHeartbeats = data.auth_logs || [];
+          authLogSortState.key = '';
+          renderLogsTableBody(authHeartbeats, auth.role);
+        } else {
+          throw new Error(data.error || '無法讀取狀態');
         }
-      } catch (e) {}
+      } catch (err) {
+        console.error('Silent refresh status failed:', err);
+        if (err.message.includes('Unauthorized') || err.message.includes('invalid API token')) {
+          alert('系統 API 金鑰已變更或失效，已自動登出，請重新登入！');
+          logout();
+        } else {
+          alert('連線同步錯誤: ' + err.message);
+        }
+      }
+    }
+
+    async function fetchAdminHostsData(token) {
+      const selectEl = document.getElementById('manual-host-select');
+      
+      try {
+        const data = await callGasApi('get_host_list', { token });
+        if (data && data.ok) {
+          if (selectEl) {
+            selectEl.innerHTML = '';
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = '';
+            defaultOpt.textContent = '-- 請選擇目標主機 --';
+            selectEl.appendChild(defaultOpt);
+            
+            data.hosts.forEach(h => {
+              const opt = document.createElement('option');
+              opt.value = h.hostname;
+              opt.textContent = h.hostname + ' (' + h.os_type + ')';
+              if (h.hostname === hostState.manualHost) {
+                opt.selected = true;
+              }
+              selectEl.appendChild(opt);
+            });
+          }
+          
+          registeredHosts = data.hosts || [];
+          // Render sorted list
+          if (sortState.key) {
+            const key = sortState.key;
+            registeredHosts.sort((a, b) => {
+              let valA = a[key] || '';
+              let valB = b[key] || '';
+              if (key === 'last_seen_at') {
+                const timeA = parseDateForSort(valA);
+                const timeB = parseDateForSort(valB);
+                return sortState.asc ? timeA - timeB : timeB - timeA;
+              }
+              if (typeof valA === 'string') valA = valA.toLowerCase();
+              if (typeof valB === 'string') valB = valB.toLowerCase();
+              if (valA < valB) return sortState.asc ? -1 : 1;
+              if (valA > valB) return sortState.asc ? 1 : -1;
+              return 0;
+            });
+          }
+          renderHostsTableBody();
+        } else {
+          throw new Error(data.error);
+        }
+      } catch (err) {
+        console.error('Error fetching host list:', err);
+        const tblBody = document.getElementById('hosts-list-table-body');
+        if (tblBody) {
+          tblBody.innerHTML = '<tr><td colspan="5" style="padding: 15px; text-align: center; color: var(--danger);">載入失敗：' + err.message + '</td></tr>';
+        }
+      }
+    }
+
+    function sortGuestLogsTable(key) {
+      if (guestLogSortState.key === key) {
+        guestLogSortState.asc = !guestLogSortState.asc;
+      } else {
+        guestLogSortState.key = key;
+        guestLogSortState.asc = true;
+      }
+      
+      guestHeartbeats.sort((a, b) => {
+        let valA = a[key] || '';
+        let valB = b[key] || '';
+        if (key === 'timestamp') {
+          const timeA = parseDateForSort(a.timestamp || a.local_time);
+          const timeB = parseDateForSort(b.timestamp || b.local_time);
+          return guestLogSortState.asc ? timeA - timeB : timeB - timeA;
+        }
+        
+        if (typeof valA === 'string') valA = valA.toLowerCase();
+        if (typeof valB === 'string') valB = valB.toLowerCase();
+        
+        if (valA < valB) return guestLogSortState.asc ? -1 : 1;
+        if (valA > valB) return guestLogSortState.asc ? 1 : -1;
+        return 0;
+      });
+      
+      renderGuestLogsTableBody(guestHeartbeats);
+    }
+
+    function sortAuthLogsTable(key) {
+      if (authLogSortState.key === key) {
+        authLogSortState.asc = !authLogSortState.asc;
+      } else {
+        authLogSortState.key = key;
+        authLogSortState.asc = true;
+      }
+      
+      authHeartbeats.sort((a, b) => {
+        let valA = a[key] || '';
+        let valB = b[key] || '';
+        if (key === 'timestamp') {
+          const timeA = parseDateForSort(a.timestamp || a.local_time);
+          const timeB = parseDateForSort(b.timestamp || b.local_time);
+          return authLogSortState.asc ? timeA - timeB : timeB - timeA;
+        }
+        
+        if (typeof valA === 'string') valA = valA.toLowerCase();
+        if (typeof valB === 'string') valB = valB.toLowerCase();
+        
+        if (valA < valB) return authLogSortState.asc ? -1 : 1;
+        if (valA > valB) return authLogSortState.asc ? 1 : -1;
+        return 0;
+      });
+      
+      let role = 'guest';
+      try {
+        const session = sessionStorage.getItem('falo_auth');
+        if (session) role = JSON.parse(session).role;
+      } catch(e){}
+      
+      renderLogsTableBody(authHeartbeats, role);
+    }
+
+    function sortHostsTable(key) {
+      if (sortState.key === key) {
+        sortState.asc = !sortState.asc;
+      } else {
+        sortState.key = key;
+        sortState.asc = true;
+      }
+      
+      registeredHosts.sort((a, b) => {
+        let valA = a[key] || '';
+        let valB = b[key] || '';
+        if (key === 'last_seen_at') {
+          const timeA = parseDateForSort(valA);
+          const timeB = parseDateForSort(valB);
+          return sortState.asc ? timeA - timeB : timeB - timeA;
+        }
+        
+        if (typeof valA === 'string') valA = valA.toLowerCase();
+        if (typeof valB === 'string') valB = valB.toLowerCase();
+        
+        if (valA < valB) return sortState.asc ? -1 : 1;
+        if (valA > valB) return sortState.asc ? 1 : -1;
+        return 0;
+      });
+      
+      const keys = ['hostname', 'os_type', 'lan_url', 'wan_url', 'last_seen_at'];
+      keys.forEach(k => {
+        const indicator = document.getElementById(`sort-${k}`);
+        if (indicator) {
+          if (k === key) {
+            indicator.textContent = sortState.asc ? ' ▲' : ' ▼';
+            indicator.style.color = 'var(--accent)';
+          } else {
+            indicator.textContent = '';
+            indicator.style.color = '';
+          }
+        }
+      });
+      
+      renderHostsTableBody();
+    }
+
+    function renderHostsTableBody() {
+      const tableBodyEl = document.getElementById('hosts-list-table-body');
+      tableBodyEl.innerHTML = '';
+      if (registeredHosts.length === 0) {
+        tableBodyEl.innerHTML = '<tr><td colspan="5" style="padding: 15px; text-align: center; color: var(--text-muted);">無上報主機紀錄</td></tr>';
+        return;
+      }
+      
+      registeredHosts.forEach(h => {
+        const row = document.createElement('tr');
+        row.style.borderBottom = '1px solid var(--border)';
+        const isSelected = h.hostname === hostState.manualHost && hostState.routingMode === 'manual';
+        
+        const lanHtml = h.lan_url ? `
+          <div style="display: inline-flex; align-items: center; gap: 4px;">
+            <a href="${h.lan_url}" target="_blank" style="color: var(--accent); text-decoration: none; word-break: break-all;">${h.lan_url}</a>
+            <button class="secondary" style="padding: 1px 4px; font-size: 0.68rem;" onclick="copyTextDirect('${h.lan_url}', this)">📋</button>
+          </div>
+        ` : '-';
+        
+        const wanHtml = h.wan_url ? `
+          <div style="display: inline-flex; align-items: center; gap: 4px;">
+            <a href="${h.wan_url}" target="_blank" style="color: var(--accent); text-decoration: none; word-break: break-all;">${h.wan_url}</a>
+            <button class="secondary" style="padding: 1px 4px; font-size: 0.68rem;" onclick="copyTextDirect('${h.wan_url}', this)">📋</button>
+          </div>
+        ` : '-';
+
+        const timeStr = formatTaipeiTime(h.last_seen_at || h.local_time);
+
+        row.innerHTML = `
+          <td style="padding: 10px; font-weight: 600;">${isSelected ? '⭐️ ' : ''}${h.hostname}</td>
+          <td style="padding: 10px;">${h.os_type || '-'}</td>
+          <td style="padding: 10px;">${lanHtml}</td>
+          <td style="padding: 10px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${wanHtml}</td>
+          <td style="padding: 10px;">${timeStr}</td>
+        `;
+        tableBodyEl.appendChild(row);
+      });
+    }
+
+    async function saveRoutingConfig(btn) {
+      const mode = document.querySelector('input[name="routing-mode"]:checked').value;
+      const selectedHost = document.getElementById('manual-host-select').value;
+      
+      if (mode === 'manual' && !selectedHost) {
+        alert('請選擇您要指定的目標主機！');
+        return;
+      }
+      
+      setBtnState(btn, true, '儲存中...');
+      try {
+        const data = await callGasApi('set_routing_config', {
+          token: getApiToken(),
+          routing_mode: mode,
+          manual_host: selectedHost
+        });
+        if (data && data.ok) {
+          alert('路由模式與主機設定已儲存！');
+          await refreshStatusSilent(getApiToken());
+        } else {
+          alert('儲存失敗：' + data.error);
+        }
+      } catch (err) {
+        alert('連線失敗：' + err.message);
+      } finally {
+        setBtnState(btn, false, '🔒 儲存路由設定');
+      }
     }
 
     async function exportSystemSettings(btn) {
@@ -788,7 +1527,8 @@
         });
         if (data && data.ok) {
           alert('主機紀錄與日誌已成功清空！');
-          location.reload();
+          const auth = JSON.parse(sessionStorage.getItem('falo_auth'));
+          fetchAdminHostsData(auth.token);
         } else {
           alert('清理失敗：' + data.error);
         }
@@ -819,9 +1559,9 @@
         refreshStatusSilent(auth.token);
       } else {
         if (savedGasUrl) {
-          refreshStatusSilent('123456');
+          // 預設不自動加載資料，點選「連線」按鈕後才加載
+          // refreshGuestStatus();
         } else {
-          document.getElementById('conn-status-msg').style.display = 'block';
           document.getElementById('conn-status-msg').textContent = '⚠️ 請先輸入您的 Google Apps Script 部署 URL 並點選連線。';
           document.getElementById('conn-status-msg').className = 'conn-status conn-fail';
         }
