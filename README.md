@@ -1,53 +1,55 @@
 # AI NotebookLM Runtime Lab
 
-這是一個教學型 MVP，示範如何把 NotebookLM 上傳流程從「個人腳本」整理成可操作、可觀察、可治理的 local-first runtime。
+這是一個整合 **地端 Python 伺服器 (Runtime Server)**、**前端操作面板 (Portal)**、**Google Apps Script (GAS) 雲端派工** 以及 **Excel 資料審計 (ETL/Audit)** 的完整教學展示專案。
 
-公開版重點放在架構與方法，不放真實帳號、Notebook ID、cookie、本機絕對路徑或實際資料。
+為了方便學員循序漸進地學習，本專案已整理劃分為以下兩個主要版本目錄：
 
-## Public Page
+---
 
-- GitHub Pages: <https://falo-taiwan.github.io/ai-notebooklm/>
-- Refactor Notes: <https://falo-taiwan.github.io/ai-notebooklm/docs/refactor_notes.html>
-- Student Guide: <https://falo-taiwan.github.io/ai-notebooklm/docs/student_guide.html>
-- Command Package Example: <https://falo-taiwan.github.io/ai-notebooklm/examples/sample_command_package_upload_folder.json>
+## 📂 版本目錄導覽
 
-## 核心概念
+### 1. [v1/ (測試開發研究版)](file:///Users/force/Google_Antigravity/AI_NotebookLM/v1)
+*   **定位**：這兩天工作之前的最初靜態概念與學術架構展示版本。
+*   **特色**：
+    *   僅包含單檔前端 Portal 模擬與系統架構圖（不需啟動地端 Python 伺服器即可直接點開瀏覽）。
+    *   內含傳統 single-file 的 HTML 實作研究。
+*   **線上 Pages 網址**：<https://falo-taiwan.github.io/ai-notebooklm/v1/index.html>
 
-- HTML portal 是操作入口，不是核心。
-- Python runtime 負責掃描、排隊、執行、紀錄與 adapter 呼叫。
-- NotebookLM 前面的 ETL layer 才是可治理、可擴充的價值點。
-- JSON / CSV / Excel 可以作為 AI-native 的中介資料格式。
-- Command package 先在本機 queue 驗證，未來可接 API、GAS 或遠端主機。
+### 2. [v2/ (正式 POC/MVP 版)](file:///Users/force/Google_Antigravity/AI_NotebookLM/v2)
+*   **定位**：這兩天作業整合多用戶、多 Session 對話、Apps Script web 控制台與權限安全隔離的正式版本。
+*   **特色**：
+    *   **地端 Runtime 伺服器**：採用多執行緒地端 Python 後端，提供對話、上傳排隊 (Task Queue) 與本地對帳審計。
+    *   **智慧對話隔離**：同仁登入後僅能看到自己建立的 Session；管理員（Admin）可檢視全局審計日誌，但無法介入干擾同仁對話。
+    *   **Apps Script 整合**：雲端 Apps Script 與 `gas-web.html` Portal 配合，實現外部郵件/表單自動派工地端。
+*   **一鍵啟動**：
+    *   macOS: 執行 [v2/FALO_Runtime.command](file:///Users/force/Google_Antigravity/AI_NotebookLM/v2/FALO_Runtime.command)
+    *   Windows: 執行 [v2/FALO_Runtime.bat](file:///Users/force/Google_Antigravity/AI_NotebookLM/v2/FALO_Runtime.bat)
+*   **線上 Pages 網址**：<https://falo-taiwan.github.io/ai-notebooklm/v2/index.html>
 
-## MVP 功能
+---
 
-- Simple Upload：選 NotebookLM project，選檔案或掃描資料夾後上傳。
-- ETL Upload：Excel 轉 CSV、normalize、再上傳。
-- Project Manager：專案搜尋、排序、分頁、選取與新增。
-- Logs / Governance：操作 log、錯誤 log、runtime 狀態與匯出。
-- Command Queue：用 JSON 指令包模擬多人派工與自動執行。
+## 🌐 線上部署與教學連結 (GitHub Pages)
 
-## 本機啟動
+本專案已於 `falo-taiwan` GitHub 組織中啟用 Pages 靜態網站部署：
+
+*   **雙版本入口網頁 (Main Gateway)**: <https://falo-taiwan.github.io/ai-notebooklm/>
+*   **V2 學生教學手冊 (Student Guide)**: <https://falo-taiwan.github.io/ai-notebooklm/v2/docs/student_guide.html>
+*   **V2 改版架構筆記 (Refactor Notes)**: <https://falo-taiwan.github.io/ai-notebooklm/v2/docs/refactor_notes.html>
+*   **V2 GAS 雲端控制台 (GAS Portal)**: <https://falo-taiwan.github.io/ai-notebooklm/v2/gas-web.html>
+
+---
+
+## 🛠️ 地端啟動說明 (v2)
+
+請確保已在本機完成 `pip install -r requirements.txt`，接著只需進入 `v2/` 目錄並執行啟動腳本即可：
 
 ```bash
-python3 runtime_server.py
+cd v2
+./FALO_Runtime.command
 ```
 
-或在 macOS 使用專案提供的一鍵啟動檔。
+啟動後會自動完成環境檢查、Port 衝突管理，並在背景運行服務後自動彈出瀏覽器開啟 Portal 主畫面。
 
-## 公開版邊界
+---
 
-這個 repo 適合公開展示 runtime / ETL / governance 的設計思路。正式部署時請另外管理：
-
-- NotebookLM 登入狀態與 cookies
-- 真實 project / notebook id
-- 本機資料路徑
-- 客戶、學生或組織資料
-- 上傳紀錄與 evidence copy
-
-## 文件
-
-- `index.html`：GitHub Pages 用的單檔專案簡介。
-- `docs/refactor_notes.md`：架構與改版筆記。
-- `docs/refactor_notes.html`：人看的 HTML 版筆記。
-- `examples/sample_command_package_upload_folder.json`：去識別化指令包範例。
+© 2026 FALO x TAAT x Force Cheng. All rights reserved. 教學實戰示範專案。

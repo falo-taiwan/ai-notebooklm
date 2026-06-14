@@ -1,6 +1,0 @@
-openpyxl
-watchdog
-tzdata
-notebooklm-py
-playwright
-python-docx

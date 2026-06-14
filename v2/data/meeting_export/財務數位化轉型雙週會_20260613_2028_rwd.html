@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>財務數位化轉型雙週會</title>
+<style>
+:root{--pri:#1a3a5c;--acc:#2e7d32;--red:#b71c1c;--bg:#f4f6f9;--card:#fff;
+      --txt:#2c3e50;--dim:#607d8b;--bdr:#e0e0e0}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,"Segoe UI","標楷體",sans-serif;
+     background:var(--bg);color:var(--txt);line-height:1.65}
+/* ── Hero ─────────────────────────────────────────────────────────────── */
+.hero{background:var(--pri);color:#fff;padding:28px 20px 24px}
+.hero-badge{display:inline-block;background:rgba(255,255,255,.18);
+            border:1px solid rgba(255,255,255,.4);border-radius:20px;
+            padding:2px 12px;font-size:.78rem;letter-spacing:.08em;margin-bottom:10px}
+.hero h1{font-size:clamp(1.15rem,4vw,1.7rem);font-weight:700;margin-bottom:6px}
+.hero .meta{font-size:.875rem;opacity:.8}
+/* ── Container & Card ─────────────────────────────────────────────────── */
+.container{max-width:900px;margin:0 auto;padding:20px 16px}
+.card{background:var(--card);border-radius:10px;
+      box-shadow:0 1px 8px rgba(0,0,0,.09);margin-bottom:18px;overflow:hidden}
+.card-hdr{padding:10px 18px;font-weight:700;font-size:.92rem;letter-spacing:.04em;
+           color:#fff}
+.card-hdr.green{background:var(--acc)}
+.card-hdr.navy{background:var(--pri)}
+.card-hdr.slate{background:#37474f}
+.card-hdr.red{background:var(--red)}
+.card-body{padding:18px}
+/* ── Info Grid ────────────────────────────────────────────────────────── */
+.info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+.info-item label{display:block;font-size:.72rem;font-weight:700;
+                 text-transform:uppercase;color:var(--dim);margin-bottom:3px;
+                 letter-spacing:.05em}
+.info-item span{font-size:.95rem}
+.info-item.wide{grid-column:1/-1}
+/* ── Action Table ─────────────────────────────────────────────────────── */
+.action-wrap{overflow-x:auto}
+table.ai{width:100%;border-collapse:collapse;font-size:.9rem}
+.ai th{background:#37474f;color:#fff;padding:9px 14px;text-align:left;
+        white-space:nowrap}
+.ai td{padding:9px 14px;border-bottom:1px solid var(--bdr)}
+.ai tr:last-child td{border-bottom:none}
+.ai tr:nth-child(even) td{background:#f8fafb}
+.tc{text-align:center}
+.nowrap{white-space:nowrap}
+.muted{color:#aaa}
+/* ── Discussion ───────────────────────────────────────────────────────── */
+.disc-item{margin-bottom:18px}
+.disc-item:last-child{margin-bottom:0}
+.disc-title{font-weight:700;color:var(--pri);padding-left:12px;
+            border-left:3px solid var(--acc);margin-bottom:8px;font-size:.98rem}
+.disc-bullet{padding:3px 0 3px 22px;font-size:.93rem;position:relative}
+.disc-bullet::before{content:"·";position:absolute;left:9px;color:var(--acc);
+                     font-weight:bold}
+/* ── Chair ────────────────────────────────────────────────────────────── */
+.chair-person{font-weight:700;color:var(--red);margin:14px 0 6px;font-size:.98rem}
+.chair-person:first-child{margin-top:0}
+.chair-instr{padding:3px 0 3px 20px;font-size:.93rem;font-weight:600}
+/* ── Footer ───────────────────────────────────────────────────────────── */
+.footer{text-align:center;font-size:.78rem;color:var(--dim);padding:24px 0 32px}
+/* ── Mobile: stack table as cards ────────────────────────────────────── */
+@media(max-width:540px){
+  .ai thead{display:none}
+  .ai tr{display:block;border:1px solid var(--bdr);border-radius:8px;
+          margin-bottom:10px;overflow:hidden}
+  .ai td{display:block;padding:7px 14px;border-bottom:1px solid #f0f0f0}
+  .ai td::before{content:attr(data-label);display:block;
+                 font-size:.72rem;font-weight:700;color:var(--dim);
+                 text-transform:uppercase;margin-bottom:2px}
+  .ai tr:nth-child(even) td{background:var(--card)}
+}
+@media print{
+  body{background:#fff}
+  .card{box-shadow:none;border:1px solid #ccc;page-break-inside:avoid}
+  .hero{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="container">
+    <div class="hero-badge">集團會議紀錄</div>
+    <h1>財務數位化轉型雙週會</h1>
+    <div class="meta">2026年5月18日&emsp;14:00-15:30&emsp;Teams 線上會議</div>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="card">
+    <div class="card-hdr navy">會議基本資訊</div>
+    <div class="card-body">
+      <div class="info-grid">
+<div class="info-item"><label>日期</label><span>2026年5月18日</span></div>
+<div class="info-item"><label>時間</label><span>14:00-15:30</span></div>
+<div class="info-item"><label>地點</label><span>Teams 線上會議</span></div>
+<div class="info-item wide"><label>出席者</label><span>董事長、CFO、會計長、Jennifer、各DRI</span></div>
+<div class="info-item wide"><label>記錄人</label><span>NotebookLM 整理版 (Jennifer)</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr green">議程</div>
+    <div class="card-body">1.待辦事項進度討論（報告人：各DRI）；2.SAP/LCM 系統對接進度（報告人：會計長）</div>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr slate">Action Items</div>
+    <div class="card-body action-wrap">
+      <table class="ai">
+        <thead>
+          <tr>
+            <th style="width:60px">項次</th>
+            <th>Action items</th>
+            <th style="width:110px">DRI</th>
+            <th style="width:130px">預計完成日</th>
+          </tr>
+        </thead>
+        <tbody>
+<tr><td data-label="項次" class="tc">1</td><td data-label="Action items">整合 IFRS 與 WIP 分析，提出標準範本報告</td><td data-label="DRI" class="tc nowrap">CFO</td><td data-label="預計完成日" class="tc nowrap">5月31日</td></tr>
+<tr><td data-label="項次" class="tc">2</td><td data-label="Action items">SAP 系統帳號權限重構與核決權限測試</td><td data-label="DRI" class="tc nowrap">會計長</td><td data-label="預計完成日" class="tc nowrap">6月15日</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr navy">討論事項與決議</div>
+    <div class="card-body">
+<div class="disc-item">
+<div class="disc-title">議題一：待辦事項進度討論（報告人：各DRI）</div>
+<div class="disc-bullet">現況 / 問題點：跨法人存貨追溯尚未整合，導致 WIP 分析不一致。</div>
+<div class="disc-bullet">決議 / 共識：拟由會計長主導，於5月31日前建立對接標準範本。</div>
+<div class="disc-bullet">仍為 Pending：LCM 的合約管理權限待法務審核。</div>
+</div>
+<div class="disc-item">
+<div class="disc-title">議題二：SAP/LCM 系統對接進度（報告人：會計長）</div>
+<div class="disc-bullet">現況 / 問題點：BPC 系統主檔欄位與 SAP 有差異。</div>
+<div class="disc-bullet">決議 / 共識：主檔以 SAP 為主進行 normalize。</div>
+</div>
+    </div>
+  </div>
+
+<div class="card">
+  <div class="card-hdr">主管指示</div>
+  <div class="card-body"><div class="chair-person">🔴 董事長指示</div>
+<div class="chair-instr">▸ 跨法人存貨追溯：必須落實，避免內控與稅務合規風險。</div>
+<div class="chair-instr">▸ 時程要求：5月31日前必須完成首期對接報告。</div>
+</div>
+</div>
+
+  <div class="footer">
+    由 NotebookLM 整理 &middot; NotebookLM 整理版 (Jennifer) &middot; 2026年5月18日
+  </div>
+
+</div>
+</body>
+</html>

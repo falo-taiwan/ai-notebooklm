@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>測試會議 會議紀錄</title>
+<style>
+body{font-family:"標楷體","DFKai-SB","MingLiU",serif;background:#e8e8e8;
+     margin:0;padding:32px 16px;font-size:12pt;color:#111;line-height:1.6}
+.page{background:#fff;max-width:794px;margin:0 auto;padding:44px 52px;
+      box-shadow:0 2px 14px rgba(0,0,0,.18)}
+h1{text-align:center;font-size:16pt;letter-spacing:.15em;margin:0 0 24px}
+table{width:100%;border-collapse:collapse;margin-bottom:18px}
+td{border:1px solid #555;padding:5px 10px;vertical-align:middle}
+.lbl{background:#d4d4d4;font-weight:bold;text-align:center;white-space:nowrap;
+      width:1%}
+.hdr{background:#4a4a4a;color:#fff;font-weight:bold;text-align:center}
+.tc{text-align:center}
+.muted{color:#999}
+.sec{font-weight:bold;font-size:13pt;margin:20px 0 6px}
+.disc-title{font-weight:bold;margin:10px 0 3px 6px}
+.bullet{margin:3px 0 3px 28px}
+.bold{font-weight:bold}
+.chair-person{font-weight:bold;margin:10px 0 3px;border-left:3px solid #555;
+              padding-left:8px}
+.agenda{margin:0 0 20px 8px;color:#333}
+@media print{
+  body{background:#fff;padding:0}
+  .page{box-shadow:none;padding:24px 32px}
+  @page{margin:1.5cm;size:A4}
+}
+</style>
+</head>
+<body>
+<div class="page">
+<h1>會&ensp;議&ensp;紀&ensp;錄</h1>
+
+<table>
+<tr><td class="lbl">會議名稱</td><td colspan="5">測試會議</td></tr>
+<tr>
+  <td class="lbl">日&emsp;期</td><td>2026年6朋13日</td>
+  <td class="lbl">時&emsp;間</td><td>20:00</td>
+  <td class="lbl">地&emsp;點</td><td>Office</td>
+</tr>
+<tr><td class="lbl">出&ensp;席&ensp;者</td><td colspan="5">Alice、Bob</td></tr>
+<tr><td class="lbl">記&ensp;錄&ensp;人</td><td colspan="5">NotebookLM 整理版 (Jennifer)</td></tr>
+</table>
+
+<p class="sec">會議議程</p>
+<p class="agenda">一、1.測試議題</p>
+
+<p class="sec">Action Items</p>
+<table>
+<tr>
+  <td class="hdr" style="width:8%">項次</td>
+  <td class="hdr">Action items</td>
+  <td class="hdr" style="width:14%">DRI</td>
+  <td class="hdr" style="width:18%">預計完成日</td>
+</tr>
+<tr><td class="tc">1</td><td>實作測試</td><td class="tc">Alice</td><td class="tc">6朋15日</td></tr>
+
+</table>
+
+<p class="sec">討論事項與決議</p>
+<p class="disc-title">測試議題</p>
+<p class="bullet">・現泋 / 問題點：無</p>
+<p class="bullet">・決議 / 共識：共識成立</p>
+
+<p class="sec">主管指示</p>
+<p class="chair-person">主管指示</p>
+<p class="bullet bold">・注感：請確實執行</p>
+
+</div>
+</body>
+</html>

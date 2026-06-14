@@ -1,0 +1,3708 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Unified Web Gateway (特權建置與作業輔助網關)</title>
+  <meta name="description" content="Unified Local-First Gateway for NotebookLM & Gemini with logs audit">
+  
+  <!-- Modern Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-color: hsl(222, 28%, 7%);
+      --bg-gradient: radial-gradient(circle at 50% 50%, hsl(222, 28%, 12%) 0%, hsl(222, 35%, 5%) 100%);
+      
+      /* Accent Colors */
+      --accent-nlm: hsl(172, 85%, 45%);
+      --accent-nlm-glow: hsla(172, 85%, 45%, 0.2);
+      
+      --accent-gemini: hsl(272, 85%, 65%);
+      --accent-gemini-glow: hsla(272, 85%, 65%, 0.2);
+      
+      --accent-converter: hsl(200, 85%, 55%);
+      --accent-converter-glow: hsla(200, 85%, 55%, 0.2);
+      
+      --accent-audit: hsl(38, 95%, 55%);
+      --accent-audit-glow: hsla(38, 95%, 55%, 0.2);
+
+      --active-accent: var(--accent-nlm);
+      --active-accent-glow: var(--accent-nlm-glow);
+
+      /* UI Tokens */
+      --text-main: hsl(210, 25%, 98%);
+      --text-muted: hsl(212, 14%, 68%);
+      --card-bg: hsla(220, 24%, 12%, 0.65);
+      --card-border: hsla(220, 20%, 25%, 0.45);
+      --input-bg: hsla(220, 24%, 8%, 0.85);
+      --glass-glow: hsla(0, 0%, 100%, 0.03);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-color);
+      background-image: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Radial ambient lights */
+    .ambient-light {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(140px);
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.6;
+      transition: all 0.8s ease;
+    }
+
+    #light-1 {
+      width: 450px;
+      height: 450px;
+      background: var(--active-accent-glow);
+      top: -10%;
+      left: 10%;
+    }
+
+    #light-2 {
+      width: 350px;
+      height: 350px;
+      background: hsla(250, 75%, 60%, 0.08);
+      bottom: 10%;
+      right: 15%;
+    }
+
+    header {
+      width: 100%;
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 24px 32px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      z-index: 10;
+      border-bottom: 1px solid var(--card-border);
+      backdrop-filter: blur(8px);
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .logo-glow {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent-nlm) 0%, var(--accent-gemini) 100%);
+      box-shadow: 0 0 20px rgba(0, 255, 200, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.3rem;
+      color: #0d1117;
+    }
+
+    .brand-text h1 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(to right, #ffffff 40%, var(--active-accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      transition: all 0.5s ease;
+    }
+
+    .brand-text p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: hsla(172, 85%, 45%, 0.08);
+      border: 1px solid hsla(172, 85%, 45%, 0.2);
+      padding: 8px 16px;
+      border-radius: 100px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent-nlm);
+      transition: all 0.3s ease;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .status-badge:hover {
+      background: hsla(172, 85%, 45%, 0.16) !important;
+      border-color: hsla(172, 85%, 45%, 0.4) !important;
+      box-shadow: 0 0 12px hsla(172, 85%, 45%, 0.25);
+    }
+
+    .status-badge.gemini-theme {
+      background: hsla(272, 85%, 65%, 0.08);
+      border: 1px solid hsla(272, 85%, 65%, 0.2);
+      color: var(--accent-gemini);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background-color: currentColor;
+      border-radius: 50%;
+      box-shadow: 0 0 10px currentColor;
+      animation: pulse 1.8s infinite;
+    }
+
+    .identity-card {
+      background: hsla(220, 20%, 15%, 0.4);
+      border: 1px solid var(--card-border);
+      padding: 6px 12px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .identity-card span {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .identity-input {
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      width: 140px;
+      outline: none;
+      transition: all 0.3s;
+    }
+
+    .identity-input:focus {
+      border-color: var(--active-accent);
+      box-shadow: 0 0 10px var(--active-accent-glow);
+    }
+
+    .nav-tabs {
+      display: flex;
+      background: hsla(220, 25%, 10%, 0.7);
+      border: 1px solid var(--card-border);
+      padding: 4px;
+      border-radius: 14px;
+      gap: 4px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 18px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: hsla(0, 0%, 100%, 0.03);
+    }
+
+    .tab-btn.active {
+      color: var(--text-main);
+      background: hsla(220, 20%, 20%, 0.9);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .tab-btn.active[data-tab="nlm"] {
+      border-bottom: 2px solid var(--accent-nlm);
+      color: var(--accent-nlm);
+    }
+
+    .tab-btn.active[data-tab="gemini"] {
+      border-bottom: 2px solid var(--accent-gemini);
+      color: var(--accent-gemini);
+    }
+
+    .tab-btn.active[data-tab="converter"] {
+      border-bottom: 2px solid var(--accent-converter);
+      color: var(--accent-converter);
+    }
+
+    .tab-btn.active[data-tab="remarks"] {
+      border-bottom: 2px solid var(--accent-audit);
+      color: var(--accent-audit);
+    }
+
+    main {
+      flex: 1;
+      width: 100%;
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 24px 32px;
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tab-pane {
+      display: none;
+      animation: tabFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      height: 100%;
+    }
+
+    .tab-pane.active {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Workspace layout: Sidebar + Chat */
+    .workspace-grid {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 24px;
+      min-height: calc(100vh - 220px);
+      align-items: stretch;
+    }
+
+    /* Sidebar list */
+    .sidebar-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 20px;
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      height: auto;
+      max-height: calc(100vh - 150px);
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .session-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-right: 4px;
+    }
+
+    .session-item {
+      background: hsla(220, 20%, 15%, 0.3);
+      border: 1px solid transparent;
+      border-radius: 12px;
+      padding: 12px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      position: relative;
+      transition: all 0.25s ease;
+    }
+
+    .session-item:hover {
+      background: hsla(220, 20%, 18%, 0.6);
+      border-color: var(--card-border);
+    }
+
+    .session-item.active {
+      background: hsla(220, 25%, 22%, 0.6);
+      border-color: var(--active-accent);
+      box-shadow: 0 4px 15px var(--active-accent-glow);
+    }
+
+    .session-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding-right: 18px;
+    }
+
+    .session-meta {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .delete-session-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.85rem;
+      opacity: 0;
+      transition: all 0.2s;
+    }
+
+    .session-item:hover .delete-session-btn {
+      opacity: 1;
+    }
+
+    .delete-session-btn:hover {
+      color: hsl(0, 85%, 60%);
+      transform: scale(1.1);
+    }
+
+    /* Main chat area */
+    .chat-container {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      height: auto;
+      min-height: 500px;
+      max-height: calc(100vh - 150px);
+      resize: vertical;
+      overflow: hidden;
+      transition: font-size 0.15s, background-color 0.25s, border-color 0.25s, box-shadow 0.25s;
+    }
+    /* Global Color Themes (Obsidian Dark, Cyber Blue, Amber Gold) */
+    body.theme-dark {
+      /* Uses default CSS variable values */
+    }
+    body.theme-cyber {
+      --bg-color: hsl(222, 45%, 4%) !important;
+      --bg-gradient: radial-gradient(circle at 50% 50%, hsl(222, 40%, 8%) 0%, hsl(222, 50%, 3%) 100%) !important;
+      --card-bg: rgba(7, 22, 44, 0.75) !important;
+      --card-border: rgba(0, 242, 254, 0.35) !important;
+      --input-bg: rgba(4, 15, 30, 0.9) !important;
+      --active-accent: #00f2fe !important;
+      --active-accent-glow: rgba(0, 242, 254, 0.25) !important;
+    }
+    body.theme-cyber .ambient-light#light-1 {
+      background: radial-gradient(circle, rgba(0, 242, 254, 0.12) 0%, transparent 70%) !important;
+    }
+    body.theme-cyber .ambient-light#light-2 {
+      background: radial-gradient(circle, rgba(0, 114, 255, 0.12) 0%, transparent 70%) !important;
+    }
+    body.theme-cyber .message-bubble.user {
+      background: linear-gradient(135deg, #00c2de, #0072ff) !important;
+      color: #fff !important;
+    }
+    body.theme-cyber .message-bubble.assistant,
+    body.theme-cyber .message-bubble.bot {
+      background: rgba(10, 30, 60, 0.8) !important;
+      border: 1px solid rgba(0, 242, 254, 0.25) !important;
+      color: #00f2fe !important;
+    }
+
+    body.theme-amber {
+      --bg-color: hsl(20, 35%, 4%) !important;
+      --bg-gradient: radial-gradient(circle at 50% 50%, hsl(20, 25%, 8%) 0%, hsl(20, 40%, 3%) 100%) !important;
+      --card-bg: rgba(32, 22, 13, 0.75) !important;
+      --card-border: rgba(245, 158, 11, 0.35) !important;
+      --input-bg: rgba(20, 12, 6, 0.9) !important;
+      --active-accent: #fbbf24 !important;
+      --active-accent-glow: rgba(245, 158, 11, 0.25) !important;
+    }
+    body.theme-amber .ambient-light#light-1 {
+      background: radial-gradient(circle, rgba(245, 158, 11, 0.12) 0%, transparent 70%) !important;
+    }
+    body.theme-amber .ambient-light#light-2 {
+      background: radial-gradient(circle, rgba(180, 83, 9, 0.12) 0%, transparent 70%) !important;
+    }
+    body.theme-amber .message-bubble.user {
+      background: linear-gradient(135deg, #d97706, #b45309) !important;
+      color: #fff !important;
+    }
+    body.theme-amber .message-bubble.assistant,
+    body.theme-amber .message-bubble.bot {
+      background: rgba(45, 32, 18, 0.8) !important;
+      border: 1px solid rgba(245, 158, 11, 0.25) !important;
+      color: #fbbf24 !important;
+    }
+
+    .chat-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: hsla(220, 25%, 10%, 0.3);
+    }
+
+    .chat-title-area {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .chat-title-main {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .chat-subtitle {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .chat-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Select elements */
+    .g-select {
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 0.85rem;
+      outline: none;
+      cursor: pointer;
+      max-width: 250px;
+      transition: border-color 0.3s;
+    }
+
+    .g-select:focus {
+      border-color: var(--active-accent);
+    }
+
+    .btn-action {
+      background: var(--active-accent);
+      color: hsl(220, 30%, 5%);
+      border: none;
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 0.85rem;
+      padding: 8px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 12px var(--active-accent-glow);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .btn-action:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px var(--active-accent-glow);
+      filter: brightness(1.1);
+    }
+
+    .btn-secondary-action {
+      background: hsla(220, 15%, 20%, 0.6);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 0.85rem;
+      padding: 8px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.25s;
+    }
+
+    .btn-secondary-action:hover {
+      background: hsla(220, 15%, 25%, 0.8);
+      border-color: var(--active-accent);
+    }
+
+    .btn-secondary-action.admin-only-btn:hover {
+      background: hsla(0, 80%, 50%, 0.25) !important;
+      border-color: hsla(0, 80%, 50%, 0.5) !important;
+      color: hsl(0, 85%, 75%) !important;
+    }
+
+    /* Chat Messages View */
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      font-size: 0.92rem;
+      background: hsla(220, 30%, 5%, 0.15);
+    }
+
+    .chat-welcome {
+      margin: auto;
+      max-width: 450px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      opacity: 0.8;
+      animation: fadeIn 0.6s ease;
+    }
+
+    .chat-welcome-icon {
+      font-size: 3rem;
+      animation: bounce 2s infinite;
+    }
+
+    .chat-welcome h3 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .chat-welcome p {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .message-bubble {
+      max-width: 75%;
+      padding: 14px 18px;
+      border-radius: 16px;
+      line-height: 1.6;
+      font-size: inherit;
+      position: relative;
+      text-align: justify;
+      animation: messageEnter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .message-bubble.user {
+      align-self: flex-end;
+      background: var(--active-accent);
+      color: hsl(220, 35%, 6%);
+      font-weight: 500;
+      border-bottom-right-radius: 4px;
+      box-shadow: 0 4px 15px var(--active-accent-glow);
+    }
+
+    .message-bubble.assistant {
+      align-self: flex-start;
+      background: hsla(220, 20%, 18%, 0.85);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .message-meta {
+      display: block;
+      font-size: 0.72rem;
+      margin-top: 6px;
+      opacity: 0.7;
+      text-align: right;
+    }
+
+    .message-bubble.user .message-meta {
+      color: hsla(220, 40%, 10%, 0.8);
+    }
+
+    .message-bubble.assistant .message-meta {
+      color: var(--text-muted);
+    }
+
+    .message-bubble pre {
+      background: hsla(220, 30%, 5%, 0.6);
+      border: 1px solid var(--card-border);
+      padding: 12px;
+      border-radius: 8px;
+      margin: 8px 0;
+      overflow-x: auto;
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+      font-size: 0.85em;
+    }
+
+    .message-bubble code {
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+      background: hsla(0, 0%, 100%, 0.08);
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-size: 0.88em;
+    }
+
+    .message-bubble.user code {
+      background: hsla(0, 0%, 0%, 0.1);
+    }
+
+    .message-bubble ul, .message-bubble ol {
+      margin-left: 20px;
+      margin-top: 6px;
+      margin-bottom: 6px;
+    }
+
+    .message-bubble li {
+      margin-bottom: 4px;
+    }
+
+    /* Typing indicator */
+    .typing-indicator {
+      display: none;
+      align-self: flex-start;
+      background: hsla(220, 20%, 18%, 0.85);
+      border: 1px solid var(--card-border);
+      padding: 14px 22px;
+      border-radius: 16px;
+      border-bottom-left-radius: 4px;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .typing-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--text-muted);
+      border-radius: 50%;
+      animation: typingGlow 1.2s infinite ease-in-out;
+    }
+
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    /* Input area */
+    .chat-input-bar {
+      padding: 16px 24px 20px;
+      border-top: 1px solid var(--card-border);
+      background: hsla(220, 25%, 8%, 0.5);
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+    }
+
+    .chat-input-textarea {
+      flex: 1;
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      resize: vertical;
+      outline: none;
+      min-height: 48px;
+      height: 60px;
+      max-height: 400px;
+      transition: border-color 0.25s, box-shadow 0.25s;
+    }
+
+    .chat-input-textarea:focus {
+      border-color: var(--active-accent);
+      box-shadow: 0 0 10px var(--active-accent-glow);
+    }
+
+    .btn-send {
+      background: var(--active-accent);
+      color: hsl(220, 30%, 5%);
+      border: none;
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px var(--active-accent-glow);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      flex-shrink: 0;
+    }
+
+    .btn-send:hover {
+      transform: scale(1.03);
+      filter: brightness(1.1);
+      box-shadow: 0 6px 16px var(--active-accent-glow);
+    }
+
+    .btn-send svg {
+      width: 20px;
+      height: 20px;
+      fill: currentColor;
+      transform: rotate(0deg);
+      transition: transform 0.3s ease;
+    }
+
+    .btn-send:hover svg {
+      transform: translate(2px, -2px) rotate(10deg);
+    }
+
+    /* Meeting minutes converter layout */
+    .converter-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      min-height: calc(100vh - 200px);
+    }
+
+    .converter-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .converter-textarea {
+      flex: 1;
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 16px;
+      border-radius: 14px;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 0.88rem;
+      line-height: 1.6;
+      resize: none;
+      outline: none;
+      min-height: 350px;
+      transition: border-color 0.3s;
+    }
+
+    .converter-textarea:focus {
+      border-color: var(--accent-converter);
+      box-shadow: 0 0 10px var(--accent-converter-glow);
+    }
+
+    .result-section {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      height: 100%;
+    }
+
+    .result-box {
+      border: 1px dashed var(--card-border);
+      border-radius: 14px;
+      padding: 24px;
+      background: hsla(220, 20%, 10%, 0.4);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 12px;
+      flex: 1;
+    }
+
+    .result-links {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .download-link-card {
+      background: hsla(220, 20%, 16%, 0.9);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      text-decoration: none;
+      color: var(--text-main);
+      transition: all 0.3s;
+    }
+
+    .download-link-card:hover {
+      border-color: var(--accent-converter);
+      background: hsla(220, 20%, 20%, 0.9);
+      transform: translateY(-2px);
+    }
+
+    .download-info {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .download-icon-circle {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: hsla(200, 85%, 55%, 0.1);
+      color: var(--accent-converter);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+    }
+
+    .download-text-meta {
+      display: flex;
+      flex-direction: column;
+      text-align: left;
+    }
+
+    .download-title {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .download-ext {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    .download-arrow {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      transition: transform 0.3s;
+    }
+
+    .download-link-card:hover .download-arrow {
+      color: var(--accent-converter);
+      transform: translateX(4px);
+    }
+
+    /* Logs audit layout */
+    .audit-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      min-height: calc(100vh - 200px);
+    }
+
+    .audit-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .search-input {
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      width: 300px;
+      outline: none;
+      transition: all 0.3s;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent-audit);
+      box-shadow: 0 0 10px var(--accent-audit-glow);
+    }
+
+    .audit-table-wrapper {
+      flex: 1;
+      overflow-x: auto;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      background: hsla(220, 25%, 8%, 0.4);
+    }
+
+    .audit-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      text-align: left;
+    }
+
+    .audit-table th, .audit-table td {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .audit-table th {
+      background: hsla(220, 25%, 12%, 0.85);
+      font-weight: 700;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .audit-table tbody tr {
+      transition: background 0.2s;
+    }
+
+    .audit-table tbody tr:hover {
+      background: hsla(220, 20%, 18%, 0.3);
+    }
+
+    .badge-platform {
+      display: inline-flex;
+      padding: 3px 10px;
+      border-radius: 100px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .badge-platform.nlm {
+      background: hsla(172, 85%, 45%, 0.1);
+      color: var(--accent-nlm);
+      border: 1px solid hsla(172, 85%, 45%, 0.2);
+    }
+
+    .badge-platform.gemini {
+      background: hsla(272, 85%, 65%, 0.1);
+      color: var(--accent-gemini);
+      border: 1px solid hsla(272, 85%, 65%, 0.2);
+    }
+
+    .action-link {
+      color: var(--active-accent);
+      text-decoration: none;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .action-link:hover {
+      text-decoration: underline;
+    }
+
+    /* Modal dialog */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(10, 14, 22, 0.85);
+      backdrop-filter: blur(10px);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-card {
+      background: hsl(220, 25%, 10%);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      width: 100%;
+      max-width: 800px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      animation: modalEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: hsla(220, 25%, 12%, 0.5);
+    }
+
+    .modal-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    .modal-close:hover {
+      color: var(--text-main);
+    }
+
+    .modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      background: hsla(220, 30%, 5%, 0.2);
+    }
+
+    /* Footer */
+    footer {
+      width: 100%;
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 20px 32px 32px;
+      border-top: 1px solid var(--card-border);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+
+    footer a {
+      color: var(--active-accent);
+      text-decoration: none;
+      transition: color 0.3s;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* Loading and Spinners */
+    .spinner {
+      border: 3px solid rgba(255, 255, 255, 0.05);
+      border-radius: 50%;
+      border-top: 3px solid currentColor;
+      width: 18px;
+      height: 18px;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+    }
+
+    .btn-action .spinner {
+      margin-right: 6px;
+    }
+
+    /* Animations */
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.6; transform: scale(0.95); }
+      50% { opacity: 1; transform: scale(1.08); }
+      100% { opacity: 0.6; transform: scale(0.95); }
+    }
+
+    @keyframes tabFadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes messageEnter {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes modalEnter {
+      from { opacity: 0; transform: scale(0.95) translateY(15px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    @keyframes typingGlow {
+      0%, 100% { opacity: 0.3; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.1); background-color: var(--active-accent); }
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    /* Scrollbar Styling */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: hsla(220, 20%, 25%, 0.6);
+      border-radius: 10px;
+    }
+
+    /* NLM Query Confirmation Modal */
+    .confirm-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(3, 7, 18, 0.7);
+      backdrop-filter: blur(8px);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .confirm-modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .confirm-modal-card {
+      background: rgba(17, 24, 39, 0.95);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px;
+      width: 90%;
+      max-width: 480px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      transform: scale(0.9);
+      transition: transform 0.3s ease;
+    }
+    .confirm-modal-overlay.active .confirm-modal-card {
+      transform: scale(1);
+    }
+    .confirm-modal-card h3 {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #fff;
+    }
+    .confirm-modal-card p.muted {
+      margin: 0;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.45;
+      text-align: left;
+    }
+    .confirm-detail-row {
+      display: flex;
+      font-size: 0.88rem;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      align-items: center;
+      gap: 8px;
+    }
+    .confirm-detail-row .label {
+      color: var(--text-muted);
+      font-weight: 600;
+      min-width: 70px;
+    }
+    .confirm-detail-row .value {
+      color: #fff;
+      font-weight: 600;
+      word-break: break-all;
+    }
+    .confirm-query-text {
+      width: 100%;
+      border-radius: 6px;
+      padding: 10px;
+      box-sizing: border-box;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      font-family: monospace;
+      line-height: 1.45;
+      text-align: left;
+      resize: vertical;
+      min-height: 60px;
+      transition: font-size 0.15s, background-color 0.2s, border-color 0.2s, color 0.2s, height 0.15s;
+    }
+    .confirm-query-text.theme-dark {
+      background: rgba(0, 0, 0, 0.35) !important;
+      border: 1px solid rgba(255, 255, 255, 0.08) !important;
+      color: #e2e8f0 !important;
+    }
+    .confirm-query-text.theme-cyber {
+      background: rgba(10, 25, 47, 0.7) !important;
+      border: 1px solid rgba(0, 242, 254, 0.3) !important;
+      color: #00f2fe !important;
+    }
+    .confirm-query-text.theme-amber {
+      background: rgba(45, 30, 15, 0.6) !important;
+      border: 1px solid rgba(245, 158, 11, 0.3) !important;
+      color: #fbbf24 !important;
+    }
+    .confirm-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .confirm-actions button {
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+    .confirm-actions .btn-cancel {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-muted);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .confirm-actions .btn-cancel:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+    .confirm-actions .btn-confirm-submit {
+      background: var(--accent-nlm);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+    }
+    .confirm-actions .btn-confirm-submit:hover {
+      background: hsl(172, 85%, 40%);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Background Ambient Lights -->
+  <div class="ambient-light" id="light-1"></div>
+  <div class="ambient-light" id="light-2"></div>
+
+  <!-- Header Banner -->
+  <header style="display: flex; flex-direction: column; gap: 12px; padding: 12px 32px 16px;">
+    <!-- Top Row: Connection URLs Bar -->
+    <div class="top-url-bar" style="display: flex; align-items: center; justify-content: flex-start; gap: 20px; font-size: 0.76rem; color: var(--text-muted); border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 8px;">
+      <!-- LAN Intranet -->
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="font-weight: 500;">🖥️ 內網 (LAN):</span>
+        <code id="header-lan-url" style="color: var(--text-main); font-family: monospace;">讀取中...</code>
+        <button onclick="copyHostUrl(this)" class="btn-action" style="padding: 1px 5px; font-size: 0.68rem; border-radius: 4px; margin: 0; background: hsla(220, 20%, 15%, 0.6); border: 1px solid var(--card-border); cursor: pointer; color: var(--text-main);" title="複製內網網址">📋 複製</button>
+      </div>
+      
+      <span style="color: rgba(255, 255, 255, 0.15);">|</span>
+      
+      <!-- Ngrok Extranet -->
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="font-weight: 500;">🌐 外網 (Ngrok):</span>
+        <code id="header-ngrok-url" style="color: var(--text-main); font-family: monospace; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">偵測中...</code>
+        <button id="copy-ngrok-btn" onclick="copyHeaderNgrokUrl()" class="btn-action" style="padding: 1px 5px; font-size: 0.68rem; border-radius: 4px; display: none; margin: 0; background: hsla(220, 20%, 15%, 0.6); border: 1px solid var(--card-border); cursor: pointer; color: var(--text-main);" title="複製外網網址">📋 複製</button>
+        <button id="refresh-ngrok-btn" onclick="refreshHeaderNgrokUrl()" class="btn-action" style="padding: 1px 5px; font-size: 0.68rem; border-radius: 4px; margin: 0; background: hsla(220, 20%, 15%, 0.6); border: 1px solid rgba(0, 255, 200, 0.3); color: var(--accent-nlm); cursor: pointer;" title="更新外網網址">🔄 更新</button>
+      </div>
+      
+      <div style="margin-left: auto; display: flex; align-items: center; gap: 12px;">
+        <span class="watermark" style="font-size: 0.72rem; color: var(--text-muted); opacity: 0.8; font-family: monospace;">v2.19版 Falo x Force Cheng 2026/6/14</span>
+        <span style="color: rgba(255, 255, 255, 0.15);">|</span>
+        <span id="user-profile-display" style="font-size: 0.76rem; color: var(--text-muted); font-weight: 600; display: flex; align-items: center; gap: 4px;">👤 讀取中...</span>
+        <button onclick="handleLogout()" class="btn-action" style="padding: 2px 8px; font-size: 0.68rem; border-radius: 4px; margin: 0; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; cursor: pointer;" title="登出系統">🔒 登出</button>
+      </div>
+    </div>
+    
+    <!-- Bottom Row: Main Navigation & Branding Bar -->
+    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+      <div class="brand-section">
+        <div class="logo-glow">AI</div>
+        <div class="brand-text">
+          <h1 id="brand-title" style="font-size: 1.15rem; margin: 0; background: linear-gradient(to right, #ffffff 40%, var(--active-accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">AI Unified Gateway</h1>
+          <p id="brand-host" style="display: none;">PORTAL HOST: 0.0.0.0</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="nav-tabs" style="margin: 0;">
+        <button class="tab-btn active" data-tab="nlm">
+          <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+          </svg>
+          NotebookLM
+        </button>
+        <button class="tab-btn" data-tab="gemini">
+          <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2L2 22h20L12 2zm0 3.99L19.53 19H4.47L12 5.99zM13 16h-2v-2h2v2zm0-4h-2V8h2v4z"/>
+          </svg>
+          Gemini Web
+        </button>
+        <button class="tab-btn" data-tab="converter">
+          <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+          </svg>
+          Minutes Tool
+        </button>
+        <button class="tab-btn" data-tab="remarks" id="tab-btn-remarks">
+          <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z"/>
+          </svg>
+          對話紀錄
+        </button>
+      </nav>
+
+      <div class="header-controls">
+        <!-- Admin Mode Switcher -->
+        <button id="admin-mode-btn" onclick="toggleAdminMode()" class="btn-action" style="padding: 6px 12px; font-size: 0.82rem; border-radius: 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; background: rgba(255, 105, 180, 0.08); border: 1px solid rgba(255, 105, 180, 0.4); color: #ff69b4; transition: all 0.25s ease;" title="開啟管理特權視窗">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="admin-icon" style="color: inherit;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+          <span>管理</span>
+        </button>
+
+        <!-- Local Portal Logout -->
+        <a href="#" onclick="logoutLocalPortal(event)" style="font-size: 0.82rem; color: var(--danger); text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; background: hsla(220, 20%, 15%, 0.4); border: 1px solid var(--card-border); padding: 6px 12px; border-radius: 12px;" title="安全登出地端控制台">
+          🔒 登出
+        </a>
+
+        <!-- Status Indicator -->
+        <div class="status-badge" id="lan-badge" onclick="copyHostUrl(this)" title="點擊複製主機網址以利傳播" style="display: none; cursor: pointer; user-select: none;">
+          <span class="status-dot"></span>
+          <span id="lan-text">LOCAL GATEWAY ON</span>
+          <span style="font-size: 0.75rem; opacity: 0.7; margin-left: 2px;">📋</span>
+        </div>
+
+        <!-- User name login simulator -->
+        <div class="identity-card">
+          <span>👤 User:</span>
+          <input type="text" class="identity-input" id="global-user-name" placeholder="輸入同仁姓名..." value="Guest">
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main View Grid -->
+  <main>
+    
+    <!-- PAN 1: NotebookLM Chat -->
+    <div class="tab-pane active" id="pane-nlm">
+      <div class="workspace-grid">
+        
+        <!-- Sidebar for past NLM sessions -->
+        <div class="sidebar-card">
+          <div class="sidebar-header">
+            <span>對話紀錄</span>
+            <button class="btn-action" style="padding: 4px 8px; font-size: 0.75rem;" onclick="loadNLMSessions()">🔄</button>
+          </div>
+          <div class="session-list" id="nlm-session-list">
+            <!-- Populated dynamically -->
+          </div>
+          
+          <!-- Queue Monitor -->
+          <div class="queue-monitor-section" style="border-top: 1px solid var(--card-border); padding-top: 15px; margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; display: flex; justify-content: space-between; align-items: center;">
+              <span>排隊佇列</span>
+              <span id="nlm-queue-count" style="font-size: 0.75rem; background: var(--card-border); padding: 2px 6px; border-radius: 100px;">0</span>
+            </div>
+            <div id="nlm-queue-list" style="display: flex; flex-direction: column; gap: 6px; font-size: 0.8rem; max-height: 120px; overflow-y: auto;">
+              <div style="color: var(--text-muted); text-align: center; padding: 10px 0; font-size: 0.75rem;">目前佇列為空 🟢</div>
+            </div>
+            <button class="btn-secondary-action admin-only-btn" style="padding: 6px; font-size: 0.75rem; justify-content: center; background: hsla(0, 80%, 50%, 0.15); border-color: hsla(0, 80%, 50%, 0.3); color: hsl(0, 85%, 65%); display: none; width: 100%;" onclick="clearQueue()">
+              🧹 清空排隊人員
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat main box -->
+        <div class="chat-container">
+          <div class="chat-header">
+            <div class="chat-title-area">
+              <span class="chat-title-main">NotebookLM Multi-turn Chat</span>
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px;">
+                <span class="chat-subtitle" id="nlm-active-session-text" style="margin: 0;">Session: 新建立對話 (無記憶隔離狀態)</span>
+                <button id="nlm-copy-session-btn" class="btn-action" style="display: none; padding: 2px 6px; font-size: 0.68rem; border-radius: 4px; background: hsla(220, 20%, 15%, 0.6); border: 1px solid var(--card-border); color: var(--text-main); cursor: pointer;" onclick="copyActiveSessionId('nlm')">📋 複製 ID</button>
+                <button id="nlm-remark-session-btn" class="btn-action" style="display: none; padding: 2px 6px; font-size: 0.68rem; border-radius: 4px; background: hsla(280, 80%, 50%, 0.15); border-color: hsla(280, 80%, 50%, 0.3); color: hsl(280, 85%, 75%); cursor: pointer;" onclick="editActiveSessionRemark('nlm')">📝 備註</button>
+              </div>
+            </div>
+            
+            <div class="chat-actions">
+              <!-- Notebook Select -->
+              <span style="font-size: 0.85rem; color: var(--text-muted);">選擇 Notebook:</span>
+              <select class="g-select" id="nlm-notebook-select" onchange="onNotebookSelected()">
+                <!-- Populated dynamically -->
+              </select>
+              <button class="btn-secondary-action" style="padding: 8px 10px;" onclick="loadNotebooks()" title="重新載入筆記本清單">
+                🔄
+              </button>
+              
+              <!-- Direct Link Button -->
+              <button class="btn-secondary-action" id="nlm-direct-btn" style="padding: 8px 12px; background: hsla(172, 85%, 45%, 0.15); border-color: hsla(172, 85%, 45%, 0.3); color: hsl(172, 85%, 75%);" onclick="openOfficialNotebook()" title="在 Google 官方網站開啟此筆記本 (使用個人普通帳號直接操作與瀏覽圖表)">
+                🔗 官方直連
+              </button>
+              
+              <!-- Copy URL Button -->
+              <button class="btn-secondary-action" id="nlm-copy-url-btn" style="padding: 8px 12px;" onclick="copyOfficialNotebookUrl()" title="複製此筆記本的 Google 官方網址到剪貼簿，以便貼到指定登入帳號的瀏覽器">
+                📋 複製網址
+              </button>
+              
+              <!-- New Chat -->
+              <button class="btn-secondary-action" onclick="resetNLMChat()">
+                + 開啟新對話
+              </button>
+            </div>
+          </div>
+
+          <!-- Privileged Builder Hint Banner -->
+          <div class="privileged-builder-hint" style="background: hsla(172, 85%, 45%, 0.06); border-bottom: 1px solid var(--card-border); padding: 10px 16px; font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: flex-start; gap: 8px; line-height: 1.45;">
+            <span style="font-size: 1rem; line-height: 1;">💡</span>
+            <span><strong>特權協同提示：</strong> 如果您在官方介面（使用個人普通帳號）無權限生成高級分析與圖表，請在此 Portal 對話框發問。地端特權帳號會自動在筆記本中建置圖表，您隨後即可在官方視窗中直接存取成果！</span>
+          </div>
+
+          <!-- Settings Toolbar -->
+          <div class="chat-setting-toolbar" style="display: flex; align-items: center; justify-content: flex-end; gap: 15px; padding: 8px 20px; background: rgba(0,0,0,0.25); border-bottom: 1px solid var(--card-border); font-size: 0.78rem; color: var(--text-muted);">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span>🔍 對話與輸入字體:</span>
+              <select class="chat-font-size-select" style="background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; outline: none; cursor: pointer;">
+                <option value="0.55rem">微小</option>
+                <option value="0.68rem">極小</option>
+                <option value="0.82rem">小</option>
+                <option value="0.95rem" selected>中 (預設)</option>
+                <option value="1.1rem">大</option>
+                <option value="1.25rem">特大</option>
+              </select>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span>🎨 視窗配色:</span>
+              <select class="chat-theme-select" style="background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; outline: none; cursor: pointer;">
+                <option value="dark" selected>暗夜黑 (Obsidian)</option>
+                <option value="cyber">科技藍 (Cyberpunk)</option>
+                <option value="amber">琥珀金 (Amber Gold)</option>
+              </select>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); opacity: 0.8; margin-left: 10px;">
+              ↕️ 拖曳視窗右下角可調整高度
+            </div>
+          </div>
+
+          <!-- Chat messages area -->
+          <div class="chat-messages" id="nlm-chat-messages">
+            <div class="chat-welcome">
+              <span class="chat-welcome-icon">📘</span>
+              <h3>載入您的 Notebook 內容</h3>
+              <p>只要本機登入了 Google 帳號，在此選擇您的 NotebookLM 筆記本。輸入您的同仁姓名即可開始隔離對話，不會污染網頁端歷史，且會保留完美的上下文多輪記憶！</p>
+            </div>
+          </div>
+
+          <!-- Typing Indicator -->
+          <div class="typing-indicator" id="nlm-typing-indicator">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+
+          <!-- Input bar -->
+          <div class="chat-input-bar">
+            <textarea class="chat-input-textarea" id="nlm-chat-input" placeholder="對指定的筆記本提問..." onkeydown="handleChatKey(event, 'nlm')"></textarea>
+            <button class="btn-send" onclick="triggerNLMSendConfirm()" id="nlm-send-btn">
+              <svg viewBox="0 0 24 24">
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- PAN 2: Gemini Web Chat -->
+    <div class="tab-pane" id="pane-gemini">
+      <div class="workspace-grid">
+        
+        <!-- Sidebar for past Gemini sessions -->
+        <div class="sidebar-card">
+          <div class="sidebar-header">
+            <span>Gemini 紀錄</span>
+            <button class="btn-action" style="padding: 4px 8px; font-size: 0.75rem;" onclick="loadGeminiSessions()">🔄</button>
+          </div>
+          <div class="session-list" id="gemini-session-list">
+            <!-- Populated dynamically -->
+          </div>
+          
+          <!-- Queue Monitor -->
+          <div class="queue-monitor-section" style="border-top: 1px solid var(--card-border); padding-top: 15px; margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; display: flex; justify-content: space-between; align-items: center;">
+              <span>排隊佇列</span>
+              <span id="gemini-queue-count" style="font-size: 0.75rem; background: var(--card-border); padding: 2px 6px; border-radius: 100px;">0</span>
+            </div>
+            <div id="gemini-queue-list" style="display: flex; flex-direction: column; gap: 6px; font-size: 0.8rem; max-height: 120px; overflow-y: auto;">
+              <div style="color: var(--text-muted); text-align: center; padding: 10px 0; font-size: 0.75rem;">目前佇列為空 🟢</div>
+            </div>
+            <button class="btn-secondary-action admin-only-btn" style="padding: 6px; font-size: 0.75rem; justify-content: center; background: hsla(0, 80%, 50%, 0.15); border-color: hsla(0, 80%, 50%, 0.3); color: hsl(0, 85%, 65%); display: none; width: 100%;" onclick="clearQueue()">
+              🧹 清空排隊人員
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat main box -->
+        <div class="chat-container">
+          <div class="chat-header">
+            <div class="chat-title-area">
+              <span class="chat-title-main">Gemini Advanced Web Proxy</span>
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px;">
+                <span class="chat-subtitle" id="gemini-active-session-text" style="margin: 0;">Session: 新建立對話 (無記憶隔離狀態)</span>
+                <button id="gemini-copy-session-btn" class="btn-action" style="display: none; padding: 2px 6px; font-size: 0.68rem; border-radius: 4px; background: hsla(220, 20%, 15%, 0.6); border: 1px solid var(--card-border); color: var(--text-main); cursor: pointer;" onclick="copyActiveSessionId('gemini')">📋 複製 ID</button>
+                <button id="gemini-remark-session-btn" class="btn-action" style="display: none; padding: 2px 6px; font-size: 0.68rem; border-radius: 4px; background: hsla(280, 80%, 50%, 0.15); border-color: hsla(280, 80%, 50%, 0.3); color: hsl(280, 85%, 75%); cursor: pointer;" onclick="editActiveSessionRemark('gemini')">📝 備註</button>
+              </div>
+            </div>
+            
+            <div class="chat-actions">
+              <span style="font-size: 0.85rem; color: var(--text-muted);">使用當前 Google 網頁登入狀態問答</span>
+              <!-- New Chat -->
+              <button class="btn-secondary-action" onclick="resetGeminiChat()">
+                + 開啟新對話
+              </button>
+            </div>
+          </div>
+
+          <!-- Settings Toolbar -->
+          <div class="chat-setting-toolbar" style="display: flex; align-items: center; justify-content: flex-end; gap: 15px; padding: 8px 20px; background: rgba(0,0,0,0.25); border-bottom: 1px solid var(--card-border); font-size: 0.78rem; color: var(--text-muted);">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span>🔍 對話與輸入字體:</span>
+              <select class="chat-font-size-select" style="background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; outline: none; cursor: pointer;">
+                <option value="0.55rem">微小</option>
+                <option value="0.68rem">極小</option>
+                <option value="0.82rem">小</option>
+                <option value="0.95rem" selected>中 (預設)</option>
+                <option value="1.1rem">大</option>
+                <option value="1.25rem">特大</option>
+              </select>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span>🎨 視窗配色:</span>
+              <select class="chat-theme-select" style="background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; outline: none; cursor: pointer;">
+                <option value="dark" selected>暗夜黑 (Obsidian)</option>
+                <option value="cyber">科技藍 (Cyberpunk)</option>
+                <option value="amber">琥珀金 (Amber Gold)</option>
+              </select>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); opacity: 0.8; margin-left: 10px;">
+              ↕️ 拖曳視窗右下角可調整高度
+            </div>
+          </div>
+
+          <!-- Chat messages area -->
+          <div class="chat-messages" id="gemini-chat-messages">
+            <div class="chat-welcome">
+              <span class="chat-welcome-icon">✨</span>
+              <h3>共享 Gemini Advanced 強 AI</h3>
+              <p>免去付費 API Key 申請，本網關自動從 Cookie (`__Secure-1PSID`) 提取會話，隔離多用戶並記錄所有提問。支持多輪對話記憶追蹤！</p>
+            </div>
+          </div>
+
+          <!-- Typing Indicator -->
+          <div class="typing-indicator" id="gemini-typing-indicator">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+
+          <!-- Model and Thinking selector -->
+          <div class="chat-model-selector" style="display: flex; gap: 8px; padding: 10px 16px; background: hsla(220, 20%, 6%, 0.5); border-top: 1px solid var(--card-border); align-items: center;">
+            <label style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">🤖 模型:</label>
+            <select id="gemini-model-select" onchange="handleGeminiModelChange()" style="background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); border-radius: 6px; padding: 5px 10px; font-size: 0.78rem; outline: none; cursor: pointer;">
+              <option value="flash-lite">3.1 Flash-Lite</option>
+              <option value="flash" selected>3.5 Flash</option>
+              <option value="pro">3.1 Pro</option>
+            </select>
+
+            <label style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600; margin-left: 12px;">💡 思考程度:</label>
+            <select id="gemini-thinking-select" style="background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); border-radius: 6px; padding: 5px 10px; font-size: 0.78rem; outline: none; cursor: pointer;">
+              <option value="standard" selected>標準</option>
+              <option value="extended">延長</option>
+              <option value="deep" id="gemini-opt-deep" style="display: none;">Deep Think</option>
+            </select>
+
+            <button class="btn-secondary-action" style="padding: 4px 10px; font-size: 0.75rem; margin-left: auto; display: flex; align-items: center; gap: 4px; height: auto;" onclick="openGeminiInfoModal()" title="查看模型與連線機制說明">ℹ️ 說明</button>
+          </div>
+
+          <!-- Input bar -->
+          <div class="chat-input-bar">
+            <textarea class="chat-input-textarea" id="gemini-chat-input" placeholder="向 Gemini Advanced 提問..." onkeydown="handleChatKey(event, 'gemini')"></textarea>
+            <button class="btn-send" onclick="triggerGeminiSendConfirm()" id="gemini-send-btn">
+              <svg viewBox="0 0 24 24">
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- PAN 3: Meeting minutes converter -->
+    <div class="tab-pane" id="pane-converter">
+      <div class="converter-grid">
+        
+        <!-- Left editor -->
+        <div class="converter-card">
+          <h3 style="font-weight: 700;">貼上會議記錄 Markdown</h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">請將 NotebookLM 產出的會議記錄 Markdown 貼在下方。點擊轉換後，系統會自動生成集團標準 Word 表格檔以及響應式 HTML 檔。</p>
+          <textarea class="converter-textarea" id="converter-input" placeholder="# 會議紀錄..."></textarea>
+          <button class="btn-action" style="padding: 12px; font-size: 1rem; width: 100%; justify-content: center;" id="converter-btn" onclick="runConversion()">
+            開始轉換格式
+          </button>
+        </div>
+
+        <!-- Right results -->
+        <div class="converter-card">
+          <h3 style="font-weight: 700;">轉換產出結果</h3>
+          <div class="result-section">
+            <div class="result-box" id="converter-welcome-box">
+              <span style="font-size: 2.5rem;">📄</span>
+              <p style="color: var(--text-muted); font-size: 0.9rem;">等待您貼上 Markdown 並點擊轉換...</p>
+            </div>
+            
+            <div class="result-links" id="converter-links-box">
+              <a href="#" class="download-link-card" id="link-docx" target="_blank">
+                <div class="download-info">
+                  <div class="download-icon-circle">📝</div>
+                  <div class="download-text-meta">
+                    <span class="download-title">集團標準 Word 表格檔</span>
+                    <span class="download-ext" id="meta-docx">docx file</span>
+                  </div>
+                </div>
+                <span class="download-arrow">➔</span>
+              </a>
+
+              <a href="#" class="download-link-card" id="link-single" target="_blank">
+                <div class="download-info">
+                  <div class="download-icon-circle" style="color: hsl(140, 80%, 45%); background: hsla(140, 80%, 45%, 0.1);">🌐</div>
+                  <div class="download-text-meta">
+                    <span class="download-title">單網頁 HTML 檔</span>
+                    <span class="download-ext" id="meta-single">single html</span>
+                  </div>
+                </div>
+                <span class="download-arrow">➔</span>
+              </a>
+
+    <!-- PAN 4: Centralized Remarks Management -->
+    <div class="tab-pane" id="pane-remarks">
+      <div class="audit-card">
+        <div class="audit-controls">
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <h3 style="font-weight: 700;">備註對話紀錄管理</h3>
+            <p style="font-size: 0.82rem; color: var(--text-muted);">在此可管理您對所有 Session ID 標註的綜合備註，並可直接檢視歷史完整問答。</p>
+          </div>
+          <div style="display: flex; gap: 12px;">
+            <input type="text" class="search-input" id="remarks-search" placeholder="搜尋同仁、備註、Session ID..." oninput="filterRemarksList()">
+            <button class="btn-secondary-action" onclick="loadRemarksList()">重新整理 🔄</button>
+          </div>
+        </div>
+
+        <div class="audit-table-wrapper">
+          <table class="audit-table">
+            <thead>
+              <tr>
+                <th>對話平台</th>
+                <th>同仁姓名</th>
+                <th style="width: 250px;">會話備註 (點擊可編輯)</th>
+                <th>對話 Session ID</th>
+                <th>最後活動時間</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="remarks-table-body">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+
+
+  </main>
+
+  <!-- Transcript Modal -->
+  <div class="modal-overlay" id="transcript-modal" onclick="closeModal(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <span class="modal-title" id="modal-title-text">會話完整問答明細</span>
+        <button class="modal-close" onclick="closeModalDirect()">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body-content">
+        <!-- Populated dynamically -->
+      </div>
+    </div>
+  </div>
+  <!-- Session Remark Modal -->
+  <div class="confirm-modal-overlay" id="session-remark-modal">
+    <div class="confirm-modal-card">
+      <h3 id="remark-modal-title">📝 編輯會話備註</h3>
+      <p class="muted" id="remark-modal-subtitle">請在下方輸入此會話 ID 的管理備忘錄：</p>
+      
+      <div style="font-size: 0.8rem; color: var(--text-muted); font-family: monospace; word-break: break-all; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px; border: 1px solid var(--card-border);" id="remark-modal-id">
+        Session ID: -
+      </div>
+      
+      <textarea id="remark-modal-textarea" style="width: 100%; height: 120px; background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); padding: 12px; border-radius: 8px; font-family: inherit; font-size: 0.9rem; resize: none; outline: none;" placeholder="在此輸入備註（例如：問題排除、專案分析、重要回覆紀錄...）"></textarea>
+      
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 5px;">
+        <button class="btn-secondary-action" onclick="closeSessionRemarkModal()" style="padding: 8px 16px;">取消</button>
+        <button class="btn-secondary-action" onclick="saveSessionRemark()" style="padding: 8px 16px; background: hsla(280, 80%, 50%, 0.15); border-color: hsla(280, 80%, 50%, 0.3); color: hsl(280, 85%, 75%);">儲存備註</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer Info -->
+  <footer>
+    <div>
+      <span>Host: <code id="footer-comp-name">detecting...</code></span>
+      <span style="margin: 0 10px; color: var(--card-border);">|</span>
+      <span>IP: <code id="footer-lan-ip">detecting...</code></span>
+      <span style="margin: 0 10px; color: var(--card-border);">|</span>
+      <span>環境: <strong style="color: var(--accent-nlm);">0.0.0.0 (對同網段開放)</strong></span>
+    </div>
+    <div>
+      <a href="index-old.html" target="_blank" style="margin-right: 15px;">🔗 瀏覽舊版管理員入口 (index-old.html)</a>
+      <span>AI NotebookLM Local-First Portal &copy; 2026.</span>
+    </div>
+  </footer>
+
+  <script>
+    // --- States & Configs ---
+    let currentTab = 'nlm';
+    let queueInterval = null;
+    let globalHostUrl = 'http://127.0.0.1:8765';
+    
+    let isAdminActive = true;
+
+    // Toggle Admin Mode
+    function toggleAdminMode() {
+      window.open('/admin.html', '_blank');
+    }
+
+    function applyAdminMode() {
+      const btn = document.getElementById('admin-mode-btn');
+      if (!btn) return;
+      
+      btn.style.color = '#ff69b4';
+      btn.style.borderColor = 'rgba(255, 105, 180, 0.4)';
+      btn.style.background = 'rgba(255, 105, 180, 0.08)';
+      
+      document.body.classList.add('admin-mode');
+      document.querySelectorAll('.admin-only-btn').forEach(el => el.style.display = 'flex');
+    }
+    
+    // Clear Queue (Admin only)
+    async function clearQueue() {
+      if (!confirm("確定要清空所有佇列中的排隊同仁嗎？(正在進行中的查詢會繼續，但後面排隊的將被取消)")) return;
+      try {
+        const res = await fetch('/api/queue/clear', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          alert("已清空佇列！");
+          await updateActiveQueue();
+        }
+      } catch (err) {
+        console.error("Failed to clear queue", err);
+      }
+    }
+    
+    // Update Active Queue list on UI
+    async function updateActiveQueue() {
+      try {
+        const res = await fetch('/api/queue/active');
+        const data = await res.json();
+        if (data.ok && data.queue) {
+          // Populate NLM queue list
+          const nlmList = document.getElementById('nlm-queue-list');
+          const nlmCount = document.getElementById('nlm-queue-count');
+          const nlmTasks = data.queue.filter(t => t.platform === 'notebooklm');
+          if (nlmCount) nlmCount.innerText = nlmTasks.length;
+          
+          if (nlmList) {
+            if (nlmTasks.length === 0) {
+              nlmList.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 10px 0; font-size: 0.75rem;">目前佇列為空 🟢</div>';
+            } else {
+              nlmList.innerHTML = '';
+              nlmTasks.forEach((t, idx) => {
+                const item = document.createElement('div');
+                item.style.padding = '6px 10px';
+                item.style.background = t.status === 'processing' ? 'hsla(172, 85%, 45%, 0.1)' : 'hsla(220, 20%, 15%, 0.3)';
+                item.style.borderLeft = t.status === 'processing' ? '3px solid var(--accent-nlm)' : '3px solid var(--card-border)';
+                item.style.borderRadius = '4px';
+                item.style.display = 'flex';
+                item.style.justifyContent = 'space-between';
+                item.style.alignItems = 'center';
+                item.style.marginBottom = '4px';
+                
+                const statusLabel = t.status === 'processing' ? '🟢 處理中' : `⏳ 排隊 (第${idx+1})`;
+                item.innerHTML = `
+                  <span style="font-weight:600;">👤 ${escapeHTML(t.user_name)}</span>
+                  <span style="font-size:0.72rem; color:var(--text-muted);">${statusLabel} (剩 ${t.eta_seconds}s)</span>
+                `;
+                nlmList.appendChild(item);
+              });
+            }
+          }
+
+          // Populate Gemini queue list
+          const geminiList = document.getElementById('gemini-queue-list');
+          const geminiCount = document.getElementById('gemini-queue-count');
+          const geminiTasks = data.queue.filter(t => t.platform === 'gemini');
+          if (geminiCount) geminiCount.innerText = geminiTasks.length;
+          
+          if (geminiList) {
+            if (geminiTasks.length === 0) {
+              geminiList.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 10px 0; font-size: 0.75rem;">目前佇列為空 🟢</div>';
+            } else {
+              geminiList.innerHTML = '';
+              geminiTasks.forEach((t, idx) => {
+                const item = document.createElement('div');
+                item.style.padding = '6px 10px';
+                item.style.background = t.status === 'processing' ? 'hsla(272, 85%, 65%, 0.1)' : 'hsla(220, 20%, 15%, 0.3)';
+                item.style.borderLeft = t.status === 'processing' ? '3px solid var(--accent-gemini)' : '3px solid var(--card-border)';
+                item.style.borderRadius = '4px';
+                item.style.display = 'flex';
+                item.style.justifyContent = 'space-between';
+                item.style.alignItems = 'center';
+                item.style.marginBottom = '4px';
+                
+                const statusLabel = t.status === 'processing' ? '✨ 處理中' : `⏳ 排隊 (第${idx+1})`;
+                item.innerHTML = `
+                  <span style="font-weight:600;">👤 ${escapeHTML(t.user_name)}</span>
+                  <span style="font-size:0.72rem; color:var(--text-muted);">${statusLabel} (剩 ${t.eta_seconds}s)</span>
+                `;
+                geminiList.appendChild(item);
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load active queue", err);
+      }
+    }
+    
+    // Start global queue monitor interval
+    setInterval(updateActiveQueue, 2500);
+    let nlmNotebooks = [];
+    let currentNlmSessionId = 'new';
+    let currentGeminiSessionId = 'new';
+    let allNlmSessions = {};
+    let allGeminiSessions = {};
+    let auditLogs = []; // Combine NLM & Gemini sessions
+
+    async function loadUserSession() {
+      try {
+        const res = await fetch('/api/local-session');
+        const data = await res.json();
+        if (data.ok && data.session) {
+          const sess = data.session;
+          const userField = document.getElementById('global-user-name');
+          if (userField) {
+            userField.value = sess.display_name;
+            userField.readOnly = true;
+            userField.style.background = 'rgba(255,255,255,0.02)';
+            userField.style.borderColor = 'rgba(255,255,255,0.05)';
+            userField.style.color = 'var(--text-muted)';
+            userField.style.cursor = 'not-allowed';
+          }
+          const profileEl = document.getElementById('user-profile-display');
+          if (profileEl) {
+            let prefix = '👤 ';
+            if (sess.role === 'admin') prefix = '👑 ';
+            else if (sess.role === 'document_manager') prefix = '📁 ';
+            profileEl.textContent = `${prefix}${sess.display_name}`;
+          }
+        } else {
+          window.location.href = '/';
+        }
+      } catch (err) {
+        console.error('Failed to load session:', err);
+        window.location.href = '/';
+      }
+    }
+
+    window.handleLogout = async function() {
+      try {
+        await fetch('/api/local-logout', { method: 'POST' });
+        window.location.reload();
+      } catch (err) {
+        alert('登出失敗: ' + err);
+      }
+    };
+
+    // On Load
+    window.addEventListener('DOMContentLoaded', async () => {
+      // Initialize admin mode to active (pink)
+      isAdminActive = true;
+      applyAdminMode();
+
+      // Load user session details and lock global-user-name input
+      await loadUserSession();
+
+      // Load server status & details
+      await loadServerStatus();
+
+      // Load notebooks list for dropdown
+      await loadNotebooks();
+
+      // Load NLM / Gemini session list
+      await loadNLMSessions();
+      await loadGeminiSessions();
+
+      // Setup tab switcher
+      setupTabSwitching();
+      
+      // Initial active queue load
+      await updateActiveQueue();
+
+      // Reset Gemini model dropdowns to default (do not restore)
+      resetGeminiModelUI();
+
+      // Load Ngrok WAN URL asynchronously
+      loadHeaderNgrokUrl();
+
+      // Initialize sending preview controls
+      initPreviewControls();
+
+      // Initialize chat container controls (font size & window color theme)
+      initChatSettingControls();
+    });
+
+    let lastActiveTab = 'nlm';
+
+    async function logoutLocalPortal(event) {
+      if (event) event.preventDefault();
+      if (!confirm('確定要登出地端控制台嗎？')) return;
+      try {
+        const res = await fetch('/api/local-logout');
+        const data = await res.json();
+        if (data.ok) {
+          window.location.reload();
+        }
+      } catch (err) {
+        alert('登出失敗: ' + err);
+      }
+    }
+
+    // Preview box state and preferences
+    let previewPrefs = {
+      fontSize: parseFloat(localStorage.getItem('falo_preview_font_size') || '0.85'),
+      height: parseInt(localStorage.getItem('falo_preview_height') || '150'),
+      theme: localStorage.getItem('falo_preview_theme') || 'dark'
+    };
+
+    function applyPreviewPrefs() {
+      document.querySelectorAll('.confirm-query-text').forEach(el => {
+        el.style.fontSize = previewPrefs.fontSize + 'rem';
+        el.style.height = previewPrefs.height + 'px';
+        // Remove old theme classes
+        el.classList.remove('theme-dark', 'theme-cyber', 'theme-amber');
+        // Add current theme class
+        el.classList.add('theme-' + previewPrefs.theme);
+      });
+      // Save to localStorage
+      localStorage.setItem('falo_preview_font_size', previewPrefs.fontSize.toString());
+      localStorage.setItem('falo_preview_height', previewPrefs.height.toString());
+      localStorage.setItem('falo_preview_theme', previewPrefs.theme);
+    }
+
+    function initPreviewControls() {
+      // Set up click handlers for all controllers in the DOM
+      document.querySelectorAll('.confirm-modal-overlay').forEach(modal => {
+        const btnFontDec = modal.querySelector('.btn-font-dec');
+        const btnFontInc = modal.querySelector('.btn-font-inc');
+        const btnHeightDec = modal.querySelector('.btn-height-dec');
+        const btnHeightInc = modal.querySelector('.btn-height-inc');
+        const swatchDark = modal.querySelector('.swatch-dark');
+        const swatchCyber = modal.querySelector('.swatch-cyber');
+        const swatchAmber = modal.querySelector('.swatch-amber');
+
+        if (btnFontDec) btnFontDec.onclick = () => {
+          previewPrefs.fontSize = Math.max(0.6, previewPrefs.fontSize - 0.05);
+          applyPreviewPrefs();
+        };
+        if (btnFontInc) btnFontInc.onclick = () => {
+          previewPrefs.fontSize = Math.min(1.6, previewPrefs.fontSize + 0.05);
+          applyPreviewPrefs();
+        };
+        if (btnHeightDec) btnHeightDec.onclick = () => {
+          previewPrefs.height = Math.max(60, previewPrefs.height - 20);
+          applyPreviewPrefs();
+        };
+        if (btnHeightInc) btnHeightInc.onclick = () => {
+          previewPrefs.height = Math.min(600, previewPrefs.height + 20);
+          applyPreviewPrefs();
+        };
+        if (swatchDark) swatchDark.onclick = () => {
+          previewPrefs.theme = 'dark';
+          applyPreviewPrefs();
+        };
+        if (swatchCyber) swatchCyber.onclick = () => {
+          previewPrefs.theme = 'cyber';
+          applyPreviewPrefs();
+        };
+        if (swatchAmber) swatchAmber.onclick = () => {
+          previewPrefs.theme = 'amber';
+          applyPreviewPrefs();
+        };
+      });
+      applyPreviewPrefs();
+    }
+
+    // Global Chat Window settings state
+    let chatPrefs = {
+      fontSize: localStorage.getItem('falo_chat_font_size') || '0.95rem',
+      theme: localStorage.getItem('falo_chat_theme') || 'dark'
+    };
+
+    function applyChatPrefs() {
+      // 1. Apply font size to both dialogue messages and input textareas
+      document.querySelectorAll('.chat-messages, .chat-input-textarea').forEach(el => {
+        el.style.fontSize = chatPrefs.fontSize;
+      });
+      // 2. Apply theme class to body for site-wide theme
+      document.body.classList.remove('theme-dark', 'theme-cyber', 'theme-amber');
+      document.body.classList.add('theme-' + chatPrefs.theme);
+      
+      // Update selector elements to reflect current choices
+      document.querySelectorAll('.chat-font-size-select').forEach(select => {
+        select.value = chatPrefs.fontSize;
+      });
+      document.querySelectorAll('.chat-theme-select').forEach(select => {
+        select.value = chatPrefs.theme;
+      });
+
+      // Save to localStorage
+      localStorage.setItem('falo_chat_font_size', chatPrefs.fontSize);
+      localStorage.setItem('falo_chat_theme', chatPrefs.theme);
+    }
+
+    function initChatSettingControls() {
+      document.querySelectorAll('.chat-container').forEach(container => {
+        const fontSelect = container.querySelector('.chat-font-size-select');
+        const themeSelect = container.querySelector('.chat-theme-select');
+        
+        if (fontSelect) {
+          fontSelect.onchange = (e) => {
+            chatPrefs.fontSize = e.target.value;
+            applyChatPrefs();
+          };
+        }
+        if (themeSelect) {
+          themeSelect.onchange = (e) => {
+            chatPrefs.theme = e.target.value;
+            applyChatPrefs();
+          };
+        }
+      });
+      applyChatPrefs();
+    }
+
+    let globalNgrokUrl = '';
+
+    async function loadHeaderNgrokUrl() {
+      const codeLabel = document.getElementById('header-ngrok-url');
+      const copyBtn = document.getElementById('copy-ngrok-btn');
+      if (!codeLabel || !copyBtn) return;
+      try {
+        const res = await fetch('/api/gas/wan-url');
+        const data = await res.json();
+        if (data.ok && data.wan_url) {
+          globalNgrokUrl = data.wan_url;
+          codeLabel.innerText = data.wan_url;
+          codeLabel.title = data.wan_url;
+          copyBtn.style.display = 'inline-block';
+        } else {
+          codeLabel.innerText = '未開啟或無外網 URL';
+          codeLabel.title = '';
+          copyBtn.style.display = 'none';
+        }
+      } catch (err) {
+        console.error("Failed to load header ngrok URL", err);
+        codeLabel.innerText = '偵測錯誤';
+        copyBtn.style.display = 'none';
+      }
+    }
+
+    async function refreshHeaderNgrokUrl() {
+      const codeLabel = document.getElementById('header-ngrok-url');
+      const copyBtn = document.getElementById('copy-ngrok-btn');
+      const refreshBtn = document.getElementById('refresh-ngrok-btn');
+      if (!codeLabel || !copyBtn || !refreshBtn) return;
+      
+      const originalBtnText = refreshBtn.innerText;
+      refreshBtn.innerText = '🔄 偵測中...';
+      refreshBtn.disabled = true;
+      codeLabel.innerText = '正在重新探測並更新...';
+
+      try {
+        const res = await fetch('/api/gas/push-host-info', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok && data.wan_url) {
+          globalNgrokUrl = data.wan_url;
+          codeLabel.innerText = data.wan_url;
+          codeLabel.title = data.wan_url;
+          copyBtn.style.display = 'inline-block';
+          alert("Ngrok 網址更新並上報成功！");
+        } else {
+          globalNgrokUrl = data.wan_url || '';
+          if (globalNgrokUrl) {
+            codeLabel.innerText = globalNgrokUrl;
+            codeLabel.title = globalNgrokUrl;
+            copyBtn.style.display = 'inline-block';
+          } else {
+            codeLabel.innerText = '未開啟或無外網 URL';
+            codeLabel.title = '';
+            copyBtn.style.display = 'none';
+          }
+          alert("上報 GAS 完成，但未偵測到活躍的 Ngrok 外網通道。");
+        }
+      } catch (err) {
+        console.error("Failed to refresh header ngrok URL", err);
+        codeLabel.innerText = '更新失敗';
+        copyBtn.style.display = 'none';
+        alert("連線失敗：" + err.message);
+      } finally {
+        refreshBtn.innerText = originalBtnText;
+        refreshBtn.disabled = false;
+      }
+    }
+
+    function copyHeaderNgrokUrl() {
+      if (!globalNgrokUrl) return;
+      navigator.clipboard.writeText(globalNgrokUrl).then(() => {
+        const btn = document.getElementById('copy-ngrok-btn');
+        if (!btn) return;
+        const originalText = btn.innerText;
+        btn.innerText = '✅ 已複製';
+        setTimeout(() => {
+          btn.innerText = originalText;
+        }, 2000);
+      }).catch(err => {
+        console.error("Failed to copy ngrok URL", err);
+        alert("複製失敗，請手動複製：\n" + globalNgrokUrl);
+      });
+    }
+
+    // Setup tab switcher
+    function setupTabSwitching() {
+      const tabs = document.querySelectorAll('.tab-btn');
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          tabs.forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+
+          const tabName = tab.getAttribute('data-tab');
+          currentTab = tabName;
+
+          // Hide all panes
+          document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+          
+          // Show active pane
+          const activePane = document.getElementById(`pane-${tabName}`);
+          if (activePane) activePane.classList.add('active');
+
+          // Change dynamic aesthetics (lights & colors)
+          updateAesthetics(tabName);
+
+          // Tab-specific trigger
+          if (tabName === 'remarks') {
+            loadRemarksList();
+          }
+        });
+      });
+    }
+
+    function updateAesthetics(tabName) {
+      const brandTitle = document.getElementById('brand-title');
+      const light1 = document.getElementById('light-1');
+      const lanBadge = document.getElementById('lan-badge');
+
+      if (tabName === 'nlm') {
+        document.documentElement.style.setProperty('--active-accent', 'var(--accent-nlm)');
+        document.documentElement.style.setProperty('--active-accent-glow', 'var(--accent-nlm-glow)');
+        brandTitle.innerText = "NotebookLM Gateway";
+        lanBadge.className = "status-badge";
+        lanBadge.style.color = "var(--accent-nlm)";
+        lanBadge.style.border = "1px solid hsla(172, 85%, 45%, 0.2)";
+        lanBadge.style.background = "hsla(172, 85%, 45%, 0.08)";
+      } else if (tabName === 'gemini') {
+        document.documentElement.style.setProperty('--active-accent', 'var(--accent-gemini)');
+        document.documentElement.style.setProperty('--active-accent-glow', 'var(--accent-gemini-glow)');
+        brandTitle.innerText = "Gemini Advanced Gateway";
+        lanBadge.className = "status-badge gemini-theme";
+        lanBadge.style.color = "var(--accent-gemini)";
+        lanBadge.style.border = "1px solid hsla(272, 85%, 65%, 0.2)";
+        lanBadge.style.background = "hsla(272, 85%, 65%, 0.08)";
+      } else if (tabName === 'converter') {
+        document.documentElement.style.setProperty('--active-accent', 'var(--accent-converter)');
+        document.documentElement.style.setProperty('--active-accent-glow', 'var(--accent-converter-glow)');
+        brandTitle.innerText = "Meeting Minutes Reformatter";
+      } else if (tabName === 'remarks') {
+        document.documentElement.style.setProperty('--active-accent', 'var(--accent-audit)');
+        document.documentElement.style.setProperty('--active-accent-glow', 'var(--accent-audit-glow)');
+        brandTitle.innerText = "Session Remarks Database";
+      }
+      light1.style.background = getComputedStyle(document.documentElement).getPropertyValue('--active-accent-glow');
+    }
+
+    // Load server status
+    async function loadServerStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const status = await res.json();
+        if (status && status.runtime_identity) {
+          const id = status.runtime_identity;
+          document.getElementById('footer-comp-name').innerText = id.computer_name || id.hostname || 'Localhost';
+          document.getElementById('footer-lan-ip').innerText = id.lan_ip || '127.0.0.1';
+          
+          const brandHostEl = document.getElementById('brand-host');
+          if (brandHostEl) {
+            brandHostEl.innerText = `PORTAL HOST: ${id.lan_ip || '0.0.0.0'}:${id.port || '8765'}`;
+          }
+          
+          const resolvedUrl = `http://${id.lan_ip || '127.0.0.1'}:${id.port || '8765'}`;
+          globalHostUrl = resolvedUrl;
+          
+          const lanTextEl = document.getElementById('lan-text');
+          if (lanTextEl) {
+            lanTextEl.innerText = `GATEWAY LAN: ${resolvedUrl}`;
+          }
+          
+          const headerLanEl = document.getElementById('header-lan-url');
+          if (headerLanEl) {
+            headerLanEl.innerText = resolvedUrl;
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load server status", err);
+      }
+    }
+
+    // Copy host portal URL to clipboard
+    function copyHostUrl(btn) {
+      if (!globalHostUrl) return;
+      navigator.clipboard.writeText(globalHostUrl).then(() => {
+        const originalText = btn.innerText;
+        btn.innerText = '✅ 已複製';
+        setTimeout(() => {
+          btn.innerText = originalText;
+        }, 1500);
+        
+        // Also update hidden element if it exists
+        const textSpan = document.getElementById('lan-text');
+        if (textSpan) {
+          const origSpanText = textSpan.innerText;
+          textSpan.innerText = '✅ 主機網址已複製！';
+          setTimeout(() => {
+            textSpan.innerText = origSpanText;
+          }, 1500);
+        }
+      }).catch(err => {
+        console.error('Failed to copy host URL:', err);
+        alert('複製失敗，請手動複製網址：\n' + globalHostUrl);
+      });
+    }
+
+    // Load notebooks list
+    async function loadNotebooks() {
+      const select = document.getElementById('nlm-notebook-select');
+      select.innerHTML = '<option value="">-- 讀取 Notebooks 中... --</option>';
+
+      try {
+        const res = await fetch('/api/notebooks?format=json');
+        const data = await res.json();
+
+        if (data.ok && data.notebooks && data.notebooks.length > 0) {
+          nlmNotebooks = data.notebooks;
+          select.innerHTML = '';
+          data.notebooks.forEach(nb => {
+            const opt = document.createElement('option');
+            opt.value = nb.id;
+            opt.innerText = `${nb.title} (${nb.total_sources} sources)`;
+            select.appendChild(opt);
+          });
+          
+          // Auto select first
+          onNotebookSelected();
+        } else {
+          if (data && data.admin_restricted) {
+            select.innerHTML = '<option value="">-- 管理者目前未開放任何對話筆記本 --</option>';
+          } else {
+            select.innerHTML = '<option value="">-- 找不到筆記本；請檢查 storage_state.json 或手動輸入 ID --</option>';
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch notebooks", err);
+        select.innerHTML = '<option value="">-- 連線失敗；請檢查後台運行 --</option>';
+      }
+    }
+
+    function onNotebookSelected() {
+      const select = document.getElementById('nlm-notebook-select');
+      const val = select.value;
+      if (val) {
+        console.log("Notebook selected:", val);
+      }
+    }
+
+    // Handle Ctrl+Enter to send for both NLM and Gemini
+    function handleChatKey(event, platform) {
+      if (platform === 'nlm') {
+        if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+          event.preventDefault();
+          triggerNLMSendConfirm();
+        }
+      } else if (platform === 'gemini') {
+        if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+          event.preventDefault();
+          triggerGeminiSendConfirm();
+        }
+      }
+    }
+
+    // --- NotebookLM Chat Logic ---
+
+    // Load NLM sessions
+    async function loadNLMSessions() {
+      try {
+        const res = await fetch('/api/multichat/sessions');
+        const data = await res.json();
+        if (data.ok && data.sessions) {
+          const list = document.getElementById('nlm-session-list');
+          list.innerHTML = '';
+          
+          data.sessions.forEach(sess => {
+            allNlmSessions[sess.conversation_id] = sess;
+
+            const item = document.createElement('div');
+            item.className = `session-item ${currentNlmSessionId === sess.conversation_id ? 'active' : ''}`;
+            item.setAttribute('id', `nlm-sess-${sess.conversation_id}`);
+            item.onclick = () => selectNLMSession(sess.conversation_id);
+
+            item.innerHTML = `
+              <div class="session-title" title="${sess.last_question || '無提問內容'}">${sess.last_question || '(空對話)'}</div>
+              ${sess.remark ? `<div class="session-remark-tag" style="font-size: 0.72rem; color: hsl(282, 80%, 75%); margin-top: 2px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHTML(sess.remark)}">📝 ${escapeHTML(sess.remark)}</div>` : ''}
+              <div class="session-meta">
+                <span>👤 ${sess.user_name}</span>
+                <span>📅 ${sess.last_query_at.split(' ')[1] || sess.last_query_at}</span>
+              </div>
+              <button class="delete-session-btn" onclick="deleteNLMSession(event, '${sess.conversation_id}')">🗑️</button>
+            `;
+            list.appendChild(item);
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load NLM sessions", err);
+      }
+    }
+
+    async function selectNLMSession(sessId) {
+      currentNlmSessionId = sessId;
+      
+      // Update sidebar highlight
+      document.querySelectorAll('#nlm-session-list .session-item').forEach(item => {
+        item.classList.remove('active');
+      });
+      const activeItem = document.getElementById(`nlm-sess-${sessId}`);
+      if (activeItem) activeItem.classList.add('active');
+
+      // Update active text and show action buttons
+      document.getElementById('nlm-active-session-text').innerText = `Session ID: ${sessId}`;
+      document.getElementById('nlm-copy-session-btn').style.display = (sessId && sessId !== 'new') ? 'inline-block' : 'none';
+      document.getElementById('nlm-remark-session-btn').style.display = (sessId && sessId !== 'new') ? 'inline-block' : 'none';
+
+      // Re-enable inputs when switching sessions
+      document.getElementById('nlm-chat-input').disabled = false;
+      document.getElementById('nlm-send-btn').disabled = false;
+
+      // Show loader
+      const messagesArea = document.getElementById('nlm-chat-messages');
+      messagesArea.innerHTML = '<div style="margin: auto;"><span class="spinner" style="color: var(--accent-nlm);"></span> 讀取雲端歷史與快取中...</div>';
+
+      try {
+        const res = await fetch(`/api/multichat/history?conversation_id=${sessId}`);
+        const data = await res.json();
+        
+        if (data.ok && data.turns) {
+          messagesArea.innerHTML = '';
+          data.turns.forEach(turn => {
+            appendMessageHTML(messagesArea, turn.role === 'user' ? 'user' : 'assistant', turn.content, turn.timestamp);
+          });
+          scrollToBottom(messagesArea);
+        } else {
+          messagesArea.innerHTML = `<div style="margin: auto; color: red;">載入失敗: ${data.error || '未知錯誤'}</div>`;
+        }
+      } catch (err) {
+        messagesArea.innerHTML = `<div style="margin: auto; color: red;">API 連線失敗: ${err.message}</div>`;
+      }
+    }
+
+    // Open notebook in Google NotebookLM official site
+    function openOfficialNotebook() {
+      const select = document.getElementById('nlm-notebook-select');
+      const notebookId = select ? select.value : '';
+      if (notebookId) {
+        window.open(`https://notebooklm.google.com/notebook/${notebookId}`, '_blank');
+      } else {
+        window.open('https://notebooklm.google.com/', '_blank');
+      }
+    }
+
+    // Copy Google NotebookLM official URL to clipboard
+    function copyOfficialNotebookUrl() {
+      const select = document.getElementById('nlm-notebook-select');
+      const notebookId = select ? select.value : '';
+      const url = notebookId 
+        ? `https://notebooklm.google.com/notebook/${notebookId}`
+        : 'https://notebooklm.google.com/';
+      
+      navigator.clipboard.writeText(url).then(() => {
+        const btn = document.getElementById('nlm-copy-url-btn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '✅ 已複製';
+        setTimeout(() => {
+          btn.innerHTML = originalText;
+        }, 2000);
+      }).catch(err => {
+        console.error('Failed to copy text: ', err);
+        alert('複製失敗，請手動複製網址：\n' + url);
+      });
+    }
+
+    function resetNLMChat() {
+      currentNlmSessionId = 'new';
+      document.getElementById('nlm-active-session-text').innerText = "Session: 新建立對話 (無記憶隔離狀態)";
+      document.getElementById('nlm-copy-session-btn').style.display = 'none';
+      document.getElementById('nlm-remark-session-btn').style.display = 'none';
+      document.querySelectorAll('#nlm-session-list .session-item').forEach(item => item.classList.remove('active'));
+      
+      // Re-enable inputs
+      document.getElementById('nlm-chat-input').disabled = false;
+      document.getElementById('nlm-send-btn').disabled = false;
+      document.getElementById('nlm-chat-input').value = '';
+      
+      const messagesArea = document.getElementById('nlm-chat-messages');
+      messagesArea.innerHTML = `
+        <div class="chat-welcome">
+          <span class="chat-welcome-icon">📘</span>
+          <h3>新建立 NotebookLM 對話</h3>
+          <p>已重置上下文。在此發送新提問，後端將為您生成獨立隔離的對話 ID，並為您留存歷史。</p>
+        </div>
+      `;
+    }
+
+    let nlmCooldownInterval = null;
+    let nlmCooldownRemaining = 0;
+    let nlmTaskFinished = true;
+    let nlmPendingQuestion = '';
+
+    function triggerNLMSendConfirm() {
+      const input = document.getElementById('nlm-chat-input');
+      const question = input.value.trim();
+      const select = document.getElementById('nlm-notebook-select');
+      const notebookName = select.options[select.selectedIndex]?.text || select.value;
+      const notebookId = select.value;
+      const userName = document.getElementById('global-user-name').value.trim();
+
+      if (!question) return;
+      if (!notebookId) {
+        alert("請先選擇或指定一個 Notebook ID！");
+        return;
+      }
+      if (!userName) {
+        alert("請在右上角輸入您的同仁姓名，以供審計紀錄！");
+        return;
+      }
+
+      nlmPendingQuestion = question;
+      document.getElementById('confirm-notebook-name').innerText = notebookName;
+      document.getElementById('confirm-user-name').innerText = userName;
+      document.getElementById('confirm-query-content').innerText = question;
+
+      document.getElementById('nlm-confirm-modal').classList.add('active');
+    }
+
+    function closeNLMConfirmModal() {
+      document.getElementById('nlm-confirm-modal').classList.remove('active');
+    }
+
+    function submitNLMConfirmedMessage() {
+      closeNLMConfirmModal();
+      if (nlmPendingQuestion) {
+        sendNLMMessage(nlmPendingQuestion);
+        nlmPendingQuestion = '';
+      }
+    }
+
+    function updateNLMCooldownButtonText() {
+      const sendBtn = document.getElementById('nlm-send-btn');
+      if (nlmCooldownRemaining > 0) {
+        sendBtn.innerHTML = `<span style="font-size: 0.78rem; font-weight: bold; color: var(--text-muted); display: flex; align-items: center; justify-content: center; height: 100%; width: 100%;">${nlmCooldownRemaining}s</span>`;
+      } else {
+        sendBtn.innerHTML = `
+          <svg viewBox="0 0 24 24">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+          </svg>
+        `;
+      }
+    }
+
+    function enableNLMChatControls() {
+      const input = document.getElementById('nlm-chat-input');
+      input.disabled = false;
+      document.getElementById('nlm-send-btn').disabled = false;
+      input.focus();
+    }
+
+    async function sendNLMMessage(question) {
+      const input = document.getElementById('nlm-chat-input');
+      const notebookId = document.getElementById('nlm-notebook-select').value;
+      const userName = document.getElementById('global-user-name').value.trim();
+
+      if (!question) return;
+      if (!notebookId) {
+        alert("請先選擇或指定一個 Notebook ID！");
+        return;
+      }
+      if (!userName) {
+        alert("請在右上角輸入您的同仁姓名，以供審計紀錄！");
+        return;
+      }
+
+      // 1. Append user bubble instantly
+      const messagesArea = document.getElementById('nlm-chat-messages');
+      const welcome = messagesArea.querySelector('.chat-welcome');
+      if (welcome) welcome.remove();
+
+      appendMessageHTML(messagesArea, 'user', question, getNowTimeString());
+      scrollToBottom(messagesArea);
+
+      // 2. Disable inputs and clear field
+      input.value = '';
+      input.disabled = true;
+      document.getElementById('nlm-send-btn').disabled = true;
+
+      // Start 10-second cooldown timer
+      nlmCooldownRemaining = 10;
+      nlmTaskFinished = false;
+      updateNLMCooldownButtonText();
+      
+      if (nlmCooldownInterval) clearInterval(nlmCooldownInterval);
+      nlmCooldownInterval = setInterval(() => {
+        nlmCooldownRemaining--;
+        updateNLMCooldownButtonText();
+        if (nlmCooldownRemaining <= 0) {
+          clearInterval(nlmCooldownInterval);
+          nlmCooldownInterval = null;
+          if (nlmTaskFinished) {
+            enableNLMChatControls();
+          }
+        }
+      }, 1000);
+
+      // Append pending queue bubble
+      const pendingBubble = document.createElement('div');
+      pendingBubble.className = 'message-bubble assistant';
+      pendingBubble.id = 'nlm-pending-bubble';
+      pendingBubble.innerHTML = `
+        <div class="message-content">
+          <span class="spinner" style="color: var(--accent-nlm);"></span> 
+          <span>正在排隊登記佇列中，請稍候...</span>
+        </div>
+        <span class="message-meta">${getNowTimeString()}</span>
+      `;
+      messagesArea.appendChild(pendingBubble);
+      scrollToBottom(messagesArea);
+
+      const typingIndicator = document.getElementById('nlm-typing-indicator');
+      typingIndicator.style.display = 'flex';
+      scrollToBottom(messagesArea);
+
+      try {
+        const formData = new URLSearchParams();
+        formData.append('notebook_id', notebookId);
+        formData.append('user_name', userName);
+        formData.append('conversation_id', currentNlmSessionId);
+        formData.append('question', question);
+
+        const res = await fetch('/api/multichat/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: formData
+        });
+        const result = await res.json();
+
+        if (result.ok) {
+          const taskId = result.task_id;
+          
+          // Start polling task status
+          const pollInterval = setInterval(async () => {
+            try {
+              const statusRes = await fetch(`/api/queue/status?task_id=${taskId}`);
+              const statusData = await statusRes.json();
+              
+              if (statusData.ok) {
+                if (statusData.status === 'pending') {
+                  pendingBubble.querySelector('.message-content').innerHTML = `
+                    <span class="spinner" style="color: var(--accent-nlm);"></span> 
+                    <span>任務排隊中... 前方還有 ${statusData.queue_position} 人，預估剩餘 ${statusData.eta_seconds} 秒...</span>
+                  `;
+                } else if (statusData.status === 'processing') {
+                  pendingBubble.querySelector('.message-content').innerHTML = `
+                    <span class="spinner" style="color: var(--accent-nlm);"></span> 
+                    <span>🤖 AI 正在連線讀取筆記並發言思考中... (剩約 ${statusData.eta_seconds}s)</span>
+                  `;
+                } else if (statusData.status === 'completed') {
+                  clearInterval(pollInterval);
+                  pendingBubble.remove();
+                  typingIndicator.style.display = 'none';
+                  
+                  // Render answer
+                  appendMessageHTML(messagesArea, 'assistant', statusData.result.answer, getNowTimeString());
+                  currentNlmSessionId = statusData.result.conversation_id;
+                  document.getElementById('nlm-active-session-text').innerText = `Session ID: ${statusData.result.conversation_id}`;
+                  document.getElementById('nlm-copy-session-btn').style.display = 'inline-block';
+                  document.getElementById('nlm-remark-session-btn').style.display = 'inline-block';
+                  
+                  // Re-enable inputs if cooldown finished
+                  nlmTaskFinished = true;
+                  if (nlmCooldownRemaining <= 0) {
+                    enableNLMChatControls();
+                  }
+                  scrollToBottom(messagesArea);
+                  
+                  await loadNLMSessions();
+                  await updateActiveQueue();
+                } else if (statusData.status === 'failed') {
+                  clearInterval(pollInterval);
+                  pendingBubble.remove();
+                  typingIndicator.style.display = 'none';
+                  
+                  appendMessageHTML(messagesArea, 'assistant', `❌ 提問失敗: ${statusData.error || '後端執行異常'}`, getNowTimeString());
+                  
+                  nlmTaskFinished = true;
+                  if (nlmCooldownRemaining <= 0) {
+                    enableNLMChatControls();
+                  }
+                  scrollToBottom(messagesArea);
+                  
+                  await updateActiveQueue();
+                }
+              } else {
+                clearInterval(pollInterval);
+                pendingBubble.remove();
+                typingIndicator.style.display = 'none';
+                appendMessageHTML(messagesArea, 'assistant', `❌ 佇列讀取錯誤: ${statusData.error}`, getNowTimeString());
+                nlmTaskFinished = true;
+                if (nlmCooldownRemaining <= 0) {
+                  enableNLMChatControls();
+                }
+                scrollToBottom(messagesArea);
+              }
+            } catch (err) {
+              clearInterval(pollInterval);
+              pendingBubble.remove();
+              typingIndicator.style.display = 'none';
+              appendMessageHTML(messagesArea, 'assistant', `❌ 連線輪詢異常: ${err.message}`, getNowTimeString());
+              nlmTaskFinished = true;
+              if (nlmCooldownRemaining <= 0) {
+                enableNLMChatControls();
+              }
+              scrollToBottom(messagesArea);
+            }
+          }, 1500);
+
+        } else {
+          pendingBubble.remove();
+          typingIndicator.style.display = 'none';
+          appendMessageHTML(messagesArea, 'assistant', `❌ 佇列登記失敗: ${result.error}`, getNowTimeString());
+          nlmTaskFinished = true;
+          if (nlmCooldownRemaining <= 0) {
+            enableNLMChatControls();
+          }
+          scrollToBottom(messagesArea);
+        }
+      } catch (err) {
+        typingIndicator.style.display = 'none';
+        if (pendingBubble) pendingBubble.remove();
+        appendMessageHTML(messagesArea, 'assistant', `❌ 網路連線異常: ${err.message}`, getNowTimeString());
+        nlmTaskFinished = true;
+        if (nlmCooldownRemaining <= 0) {
+          enableNLMChatControls();
+        }
+        scrollToBottom(messagesArea);
+      }
+    }
+    async function deleteNLMSession(event, sessId) {
+      event.stopPropagation();
+      if (!confirm(`確定要刪除這筆對話紀錄嗎？(僅會刪除地端 logs 快取)\nSession: ${sessId}`)) return;
+
+      try {
+        const formData = new URLSearchParams();
+        formData.append('conversation_id', sessId);
+        const res = await fetch('/api/multichat/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: formData
+        });
+        const result = await res.json();
+        if (result.ok) {
+          if (currentNlmSessionId === sessId) {
+            resetNLMChat();
+          }
+          await loadNLMSessions();
+        }
+      } catch (err) {
+        console.error("Delete failed", err);
+      }
+    }
+
+    // --- Gemini Web Chat Logic ---
+
+    async function loadGeminiSessions() {
+      try {
+        const res = await fetch('/api/gemini/sessions');
+        const data = await res.json();
+        if (data.ok && data.sessions) {
+          const list = document.getElementById('gemini-session-list');
+          list.innerHTML = '';
+          
+          data.sessions.forEach(sess => {
+            allGeminiSessions[sess.conversation_id] = sess;
+
+            const item = document.createElement('div');
+            item.className = `session-item ${currentGeminiSessionId === sess.conversation_id ? 'active' : ''}`;
+            item.setAttribute('id', `gemini-sess-${sess.conversation_id}`);
+            item.onclick = () => selectGeminiSession(sess.conversation_id);
+
+            item.innerHTML = `
+              <div class="session-title" title="${sess.last_question || '無提問內容'}">${sess.last_question || '(空對話)'}</div>
+              ${sess.remark ? `<div class="session-remark-tag" style="font-size: 0.72rem; color: hsl(282, 80%, 75%); margin-top: 2px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHTML(sess.remark)}">📝 ${escapeHTML(sess.remark)}</div>` : ''}
+              <div class="session-meta">
+                <span>👤 ${sess.user_name}</span>
+                <span>📅 ${sess.last_query_at.split(' ')[1] || sess.last_query_at}</span>
+              </div>
+              <button class="delete-session-btn" onclick="deleteGeminiSession(event, '${sess.conversation_id}')">🗑️</button>
+            `;
+            list.appendChild(item);
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load Gemini sessions", err);
+      }
+    }
+
+    async function selectGeminiSession(sessId) {
+      currentGeminiSessionId = sessId;
+      
+      document.querySelectorAll('#gemini-session-list .session-item').forEach(item => {
+        item.classList.remove('active');
+      });
+      const activeItem = document.getElementById(`gemini-sess-${sessId}`);
+      if (activeItem) activeItem.classList.add('active');
+
+      document.getElementById('gemini-active-session-text').innerText = `Session ID: ${sessId}`;
+      document.getElementById('gemini-copy-session-btn').style.display = (sessId && sessId !== 'new') ? 'inline-block' : 'none';
+      document.getElementById('gemini-remark-session-btn').style.display = (sessId && sessId !== 'new') ? 'inline-block' : 'none';
+
+      // Re-enable inputs when switching sessions
+      document.getElementById('gemini-chat-input').disabled = false;
+      document.getElementById('gemini-send-btn').disabled = false;
+
+      const messagesArea = document.getElementById('gemini-chat-messages');
+      messagesArea.innerHTML = '<div style="margin: auto;"><span class="spinner" style="color: var(--accent-gemini);"></span> 讀取 Gemini 歷史快取中...</div>';
+
+      try {
+        const res = await fetch(`/api/gemini/history?conversation_id=${sessId}`);
+        const data = await res.json();
+        
+        if (data.ok && data.turns) {
+          messagesArea.innerHTML = '';
+          data.turns.forEach(turn => {
+            appendMessageHTML(messagesArea, turn.role === 'user' ? 'user' : 'assistant', turn.content, turn.timestamp);
+          });
+          scrollToBottom(messagesArea);
+        } else {
+          messagesArea.innerHTML = `<div style="margin: auto; color: red;">載入失敗: ${data.error || '未知錯誤'}</div>`;
+        }
+      } catch (err) {
+        messagesArea.innerHTML = `<div style="margin: auto; color: red;">API 連線失敗: ${err.message}</div>`;
+      }
+    }
+
+    function handleGeminiModelChange() {
+      const modelSelect = document.getElementById('gemini-model-select');
+      const thinkingSelect = document.getElementById('gemini-thinking-select');
+      const deepOpt = document.getElementById('gemini-opt-deep');
+      if (modelSelect && thinkingSelect && deepOpt) {
+        if (modelSelect.value === 'pro') {
+          deepOpt.style.display = 'block';
+        } else {
+          deepOpt.style.display = 'none';
+          if (thinkingSelect.value === 'deep') {
+            thinkingSelect.value = 'standard';
+          }
+        }
+      }
+    }
+
+    function resetGeminiModelUI() {
+      const modelSelect = document.getElementById('gemini-model-select');
+      const thinkingSelect = document.getElementById('gemini-thinking-select');
+      if (modelSelect && thinkingSelect) {
+        modelSelect.value = 'flash';
+        thinkingSelect.value = 'standard';
+        handleGeminiModelChange();
+      }
+    }
+
+    function resetGeminiChat() {
+      currentGeminiSessionId = 'new';
+      document.getElementById('gemini-active-session-text').innerText = "Session: 新建立對話 (無記憶隔離狀態)";
+      document.getElementById('gemini-copy-session-btn').style.display = 'none';
+      document.getElementById('gemini-remark-session-btn').style.display = 'none';
+      document.querySelectorAll('#gemini-session-list .session-item').forEach(item => item.classList.remove('active'));
+      
+      // Re-enable inputs
+      document.getElementById('gemini-chat-input').disabled = false;
+      document.getElementById('gemini-send-btn').disabled = false;
+      document.getElementById('gemini-chat-input').value = '';
+      
+      const messagesArea = document.getElementById('gemini-chat-messages');
+      messagesArea.innerHTML = `
+        <div class="chat-welcome">
+          <span class="chat-welcome-icon">✨</span>
+          <h3>新建立 Gemini Advanced 對話</h3>
+          <p>已重置上下文。使用當前本機強 AI 登入狀態問答，並記錄所有對話。</p>
+        </div>
+      `;
+      resetGeminiModelUI();
+    }
+
+    function openGeminiInfoModal() {
+      const modal = document.getElementById('gemini-info-modal');
+      if (modal) modal.classList.add('active');
+    }
+
+    function closeGeminiInfoModal() {
+      const modal = document.getElementById('gemini-info-modal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    let geminiPendingQuestion = '';
+
+    function triggerGeminiSendConfirm() {
+      const input = document.getElementById('gemini-chat-input');
+      const question = input.value.trim();
+      const userName = document.getElementById('global-user-name').value.trim();
+
+      const modelSelect = document.getElementById('gemini-model-select');
+      const modelNameText = modelSelect.options[modelSelect.selectedIndex]?.text || modelSelect.value;
+      const modelVal = modelSelect.value;
+
+      const thinkingSelect = document.getElementById('gemini-thinking-select');
+      const thinkingNameText = thinkingSelect.options[thinkingSelect.selectedIndex]?.text || thinkingSelect.value;
+      const thinkingVal = thinkingSelect.value;
+
+      if (!question) return;
+      if (!userName) {
+        alert("請在右上角輸入您的同仁姓名，以供審計紀錄！");
+        return;
+      }
+
+      geminiPendingQuestion = question;
+      document.getElementById('gemini-confirm-model-name').innerText = modelNameText;
+      document.getElementById('gemini-confirm-thinking-name').innerText = thinkingNameText;
+      document.getElementById('gemini-confirm-user-name').innerText = userName;
+      document.getElementById('gemini-confirm-query-content').innerText = question;
+
+      // Handle warnings and disclaimers dynamically based on model and thinking level selection
+      const warningBox = document.getElementById('gemini-confirm-warning');
+      const disclaimerWrapper = document.getElementById('gemini-confirm-disclaimer-wrapper');
+      const disclaimerCheckbox = document.getElementById('gemini-confirm-disclaimer');
+      const submitBtn = document.getElementById('gemini-confirm-submit-btn');
+
+      // Reset checkbox state
+      disclaimerCheckbox.checked = false;
+
+      if (modelVal === 'pro') {
+        warningBox.style.display = 'block';
+        if (thinkingVal === 'deep') {
+          // 3.1 Pro + Deep Think: Strong red warning + checkbox consent required
+          warningBox.style.backgroundColor = 'rgba(255, 82, 82, 0.15)';
+          warningBox.style.border = '1px solid rgba(255, 82, 82, 0.4)';
+          warningBox.style.color = '#ff5252';
+          warningBox.innerHTML = '🚨 <strong>高額度消耗與全程審計警告：</strong><br>1. 啟用 Deep Think 思考程度會消耗較多地端運算額度，請確保您的提問符合資源使用規範。<br>2. 您的操作與推理思考過程將被系統全程記錄以供安全合規審計。';
+          disclaimerWrapper.style.display = 'flex';
+          submitBtn.disabled = true; // Disable until checkbox is checked
+          submitBtn.style.opacity = '0.5';
+        } else {
+          // 3.1 Pro (Standard/Extended): Yellow audit notice
+          warningBox.style.backgroundColor = 'rgba(255, 179, 0, 0.15)';
+          warningBox.style.border = '1px solid rgba(255, 179, 0, 0.4)';
+          warningBox.style.color = '#ffb300';
+          warningBox.innerHTML = '💡 <strong>操作審計提醒：</strong>3.1 Pro 為進階模型，此操作將會被記錄以供審計。';
+          disclaimerWrapper.style.display = 'none';
+          submitBtn.disabled = false;
+          submitBtn.style.opacity = '1';
+        }
+      } else {
+        // Flash / Lite: General note
+        warningBox.style.display = 'block';
+        warningBox.style.backgroundColor = 'rgba(255, 255, 255, 0.03)';
+        warningBox.style.border = '1px solid var(--card-border)';
+        warningBox.style.color = 'var(--text-muted)';
+        warningBox.innerHTML = '💡 <strong>提示：</strong>此提問已啟用常規安全審計日誌。';
+        disclaimerWrapper.style.display = 'none';
+        submitBtn.disabled = false;
+        submitBtn.style.opacity = '1';
+      }
+
+      document.getElementById('gemini-confirm-modal').classList.add('active');
+    }
+
+    function closeGeminiConfirmModal() {
+      document.getElementById('gemini-confirm-modal').classList.remove('active');
+    }
+
+    function submitGeminiConfirmedMessage() {
+      closeGeminiConfirmModal();
+      if (geminiPendingQuestion) {
+        sendGeminiMessage(geminiPendingQuestion);
+        geminiPendingQuestion = '';
+      }
+    }
+
+    function handleGeminiDisclaimerChange() {
+      const checkbox = document.getElementById('gemini-confirm-disclaimer');
+      const submitBtn = document.getElementById('gemini-confirm-submit-btn');
+      if (checkbox.checked) {
+        submitBtn.disabled = false;
+        submitBtn.style.opacity = '1';
+      } else {
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.5';
+      }
+    }
+
+    async function sendGeminiMessage(question) {
+      const input = document.getElementById('gemini-chat-input');
+      const userName = document.getElementById('global-user-name').value.trim();
+      const modelVal = document.getElementById('gemini-model-select').value;
+      const thinkingVal = document.getElementById('gemini-thinking-select').value;
+
+      // 1. Append user bubble instantly
+      const messagesArea = document.getElementById('gemini-chat-messages');
+      const welcome = messagesArea.querySelector('.chat-welcome');
+      if (welcome) welcome.remove();
+
+      appendMessageHTML(messagesArea, 'user', question, getNowTimeString());
+      scrollToBottom(messagesArea);
+
+      // 2. Disable inputs and clear field
+      input.value = '';
+      input.disabled = true;
+      document.getElementById('gemini-send-btn').disabled = true;
+
+      // Append pending bubble
+      const pendingBubble = document.createElement('div');
+      pendingBubble.className = 'message-bubble assistant';
+      pendingBubble.id = 'gemini-pending-bubble';
+      pendingBubble.innerHTML = `
+        <div class="message-content">
+          <span class="spinner" style="color: var(--accent-gemini);"></span> 
+          <span>正在排隊登記佇列中，請稍候...</span>
+        </div>
+        <span class="message-meta">${getNowTimeString()}</span>
+      `;
+      messagesArea.appendChild(pendingBubble);
+      scrollToBottom(messagesArea);
+
+      const typingIndicator = document.getElementById('gemini-typing-indicator');
+      typingIndicator.style.display = 'flex';
+      scrollToBottom(messagesArea);
+
+      let metadataVal = 'new';
+      if (currentGeminiSessionId !== 'new' && allGeminiSessions[currentGeminiSessionId]) {
+        metadataVal = allGeminiSessions[currentGeminiSessionId].metadata || 'new';
+      }
+
+      try {
+        const formData = new URLSearchParams();
+        formData.append('user_name', userName);
+        formData.append('question', question);
+        formData.append('metadata', metadataVal);
+        formData.append('model', modelVal);
+        formData.append('thinking', thinkingVal);
+
+        const res = await fetch('/api/gemini/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: formData
+        });
+        const result = await res.json();
+
+        if (result.ok) {
+          const taskId = result.task_id;
+          
+          const pollInterval = setInterval(async () => {
+            try {
+              const statusRes = await fetch(`/api/queue/status?task_id=${taskId}`);
+              const statusData = await statusRes.json();
+              
+              if (statusData.ok) {
+                if (statusData.status === 'pending') {
+                  pendingBubble.querySelector('.message-content').innerHTML = `
+                    <span class="spinner" style="color: var(--accent-gemini);"></span> 
+                    <span>任務排隊中... 前方還有 ${statusData.queue_position} 人，預估剩餘 ${statusData.eta_seconds} 秒...</span>
+                  `;
+                } else if (statusData.status === 'processing') {
+                  pendingBubble.querySelector('.message-content').innerHTML = `
+                    <span class="spinner" style="color: var(--accent-gemini);"></span> 
+                    <span>✨ Gemini 正在讀取對話並發言思考中... (剩約 ${statusData.eta_seconds}s)</span>
+                  `;
+                } else if (statusData.status === 'completed') {
+                  clearInterval(pollInterval);
+                  pendingBubble.remove();
+                  typingIndicator.style.display = 'none';
+                  
+                  appendMessageHTML(messagesArea, 'assistant', statusData.result.answer, getNowTimeString());
+                  
+                  const resolvedMeta = JSON.parse(statusData.result.metadata);
+                  const resolvedCid = resolvedMeta[0];
+                  currentGeminiSessionId = resolvedCid;
+                  document.getElementById('gemini-active-session-text').innerText = `Session ID: ${resolvedCid}`;
+                  document.getElementById('gemini-copy-session-btn').style.display = 'inline-block';
+                  document.getElementById('gemini-remark-session-btn').style.display = 'inline-block';
+                  
+                  input.disabled = false;
+                  document.getElementById('gemini-send-btn').disabled = false;
+                  input.focus();
+                  scrollToBottom(messagesArea);
+                  
+                  await loadGeminiSessions();
+                  await updateActiveQueue();
+                } else if (statusData.status === 'failed') {
+                  clearInterval(pollInterval);
+                  pendingBubble.remove();
+                  typingIndicator.style.display = 'none';
+                  
+                  appendMessageHTML(messagesArea, 'assistant', `❌ 提問失敗: ${statusData.error || 'Gemini 處理異常'}`, getNowTimeString());
+                  
+                  input.disabled = false;
+                  document.getElementById('gemini-send-btn').disabled = false;
+                  input.focus();
+                  scrollToBottom(messagesArea);
+                  
+                  await updateActiveQueue();
+                }
+              } else {
+                clearInterval(pollInterval);
+                pendingBubble.remove();
+                typingIndicator.style.display = 'none';
+                appendMessageHTML(messagesArea, 'assistant', `❌ 佇列讀取錯誤: ${statusData.error}`, getNowTimeString());
+                input.disabled = false;
+                document.getElementById('gemini-send-btn').disabled = false;
+                scrollToBottom(messagesArea);
+              }
+            } catch (err) {
+              clearInterval(pollInterval);
+              pendingBubble.remove();
+              typingIndicator.style.display = 'none';
+              appendMessageHTML(messagesArea, 'assistant', `❌ 連線輪詢異常: ${err.message}`, getNowTimeString());
+              input.disabled = false;
+              document.getElementById('gemini-send-btn').disabled = false;
+              scrollToBottom(messagesArea);
+            }
+          }, 1500);
+
+        } else {
+          pendingBubble.remove();
+          typingIndicator.style.display = 'none';
+          appendMessageHTML(messagesArea, 'assistant', `❌ 佇列登記失敗: ${result.error}`, getNowTimeString());
+          input.disabled = false;
+          document.getElementById('gemini-send-btn').disabled = false;
+          scrollToBottom(messagesArea);
+        }
+      } catch (err) {
+        typingIndicator.style.display = 'none';
+        if (pendingBubble) pendingBubble.remove();
+        appendMessageHTML(messagesArea, 'assistant', `❌ 網路連線異常: ${err.message}`, getNowTimeString());
+        input.disabled = false;
+        document.getElementById('gemini-send-btn').disabled = false;
+        scrollToBottom(messagesArea);
+      }
+    }
+
+    // --- Centralized Session Remarks & Transcripts Manager ---
+    let allRemarksSessions = [];
+    let remarkModalTargetType = '';
+    let remarkModalTargetId = '';
+
+    async function loadRemarksList() {
+      const tbody = document.getElementById('remarks-table-body');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;"><span class="spinner" style="color: var(--accent-audit);"></span> 讀取對話紀錄與備註中...</td></tr>';
+
+      try {
+        const resNlm = await fetch('/api/multichat/sessions');
+        const dataNlm = await resNlm.json();
+
+        const resGemini = await fetch('/api/gemini/sessions');
+        const dataGemini = await resGemini.json();
+
+        allRemarksSessions = [];
+
+        if (dataNlm.ok && dataNlm.sessions) {
+          dataNlm.sessions.forEach(s => {
+            allRemarksSessions.push({
+              platform: 'notebooklm',
+              user_name: s.user_name,
+              notebook_id: s.notebook_id,
+              conversation_id: s.conversation_id,
+              last_query_at: s.last_query_at,
+              last_question: s.last_question,
+              remark: s.remark || ""
+            });
+          });
+        }
+
+        if (dataGemini.ok && dataGemini.sessions) {
+          dataGemini.sessions.forEach(s => {
+            allRemarksSessions.push({
+              platform: 'gemini',
+              user_name: s.user_name,
+              notebook_id: 'Shared Session (gemini.google.com)',
+              conversation_id: s.conversation_id,
+              last_query_at: s.last_query_at,
+              last_question: s.last_question,
+              remark: s.remark || ""
+            });
+          });
+        }
+
+        // Sort descending by time
+        allRemarksSessions.sort((a, b) => new Date(b.last_query_at.replace(/-/g, '/')) - new Date(a.last_query_at.replace(/-/g, '/')));
+        renderRemarksTable(allRemarksSessions);
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:hsl(0,85%,65%);">載入對話紀錄失敗: ${err.message}</td></tr>`;
+      }
+    }
+
+    function renderRemarksTable(logs) {
+      const tbody = document.getElementById('remarks-table-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      if (logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">目前無任何對話紀錄。</td></tr>';
+        return;
+      }
+
+      logs.forEach(log => {
+        const tr = document.createElement('tr');
+        const isNlm = log.platform === 'notebooklm';
+        
+        tr.innerHTML = `
+          <td>
+            <span class="badge-platform ${isNlm ? 'nlm' : 'gemini'}">
+              ${isNlm ? 'NotebookLM' : 'Gemini Web'}
+            </span>
+          </td>
+          <td style="font-weight:600;">${escapeHTML(log.user_name)}</td>
+          <td style="cursor:pointer;" onclick="openSessionRemarkModal('${log.platform}', '${log.conversation_id}')" title="點擊編輯備註">
+            ${log.remark ? `<span style="color: hsl(282, 80%, 75%); font-weight:600; display:flex; align-items:center; gap:4px;">📝 ${escapeHTML(log.remark)}</span>` : `<span style="color:var(--text-muted); font-size:0.8rem;">+ 新增備註</span>`}
+          </td>
+          <td style="font-family:monospace; font-size:0.78rem;">
+            <span>${log.conversation_id}</span>
+            <button class="btn-action" style="padding: 2px 6px; font-size: 0.65rem; margin-left: 6px; cursor: pointer;" onclick="copyTextToClipboard('${log.conversation_id}', this)">📋 複製</button>
+          </td>
+          <td>${log.last_query_at}</td>
+          <td>
+            <div style="display:flex; gap:8px;">
+              <button class="btn-secondary-action" style="padding:4px 8px; font-size:0.75rem;" onclick="viewTranscript('${log.platform}', '${log.conversation_id}', '${escapeHTML(log.user_name)}')">🔍 檢視對話</button>
+              <button class="btn-secondary-action" style="padding:4px 8px; font-size:0.75rem; background: hsla(280, 80%, 50%, 0.15); border-color: hsla(280, 80%, 50%, 0.3); color: hsl(280, 85%, 75%);" onclick="openSessionRemarkModal('${log.platform}', '${log.conversation_id}')">📝 編輯</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function filterRemarksList() {
+      const query = document.getElementById('remarks-search').value.toLowerCase().trim();
+      if (!query) {
+        renderRemarksTable(allRemarksSessions);
+        return;
+      }
+
+      const filtered = allRemarksSessions.filter(log => {
+        return log.user_name.toLowerCase().includes(query) ||
+               log.conversation_id.toLowerCase().includes(query) ||
+               log.remark.toLowerCase().includes(query) ||
+               (log.last_question && log.last_question.toLowerCase().includes(query));
+      });
+      renderRemarksTable(filtered);
+    }
+
+    function copyTextToClipboard(text, btn) {
+      navigator.clipboard.writeText(text).then(() => {
+        const oldText = btn.innerText;
+        btn.innerText = '✔️ 已複製';
+        btn.style.color = '#00ffc8';
+        setTimeout(() => {
+          btn.innerText = oldText;
+          btn.style.color = '';
+        }, 1200);
+      }).catch(err => {
+        console.error("Failed to copy text", err);
+      });
+    }
+
+    function copyActiveSessionId(type) {
+      let sessId = '';
+      if (type === 'nlm') {
+        sessId = currentNlmSessionId;
+      } else if (type === 'gemini') {
+        sessId = currentGeminiSessionId;
+      }
+      
+      if (!sessId || sessId === 'new') return;
+      const btn = document.getElementById(`${type}-copy-session-btn`);
+      copyTextToClipboard(sessId, btn);
+    }
+
+    function editActiveSessionRemark(type) {
+      let sessId = '';
+      if (type === 'nlm') {
+        sessId = currentNlmSessionId;
+      } else if (type === 'gemini') {
+        sessId = currentGeminiSessionId;
+      }
+      
+      if (!sessId || sessId === 'new') return;
+      openSessionRemarkModal(type, sessId);
+    }
+
+    function openSessionRemarkModal(type, conversationId) {
+      remarkModalTargetType = type;
+      remarkModalTargetId = conversationId;
+      
+      document.getElementById('remark-modal-id').innerText = `Session ID: ${conversationId}`;
+      
+      // Load current remark from loaded session lists
+      let currentRemark = '';
+      if (type === 'nlm') {
+        const sess = allNlmSessions[conversationId];
+        if (sess) currentRemark = sess.remark || '';
+      } else if (type === 'gemini') {
+        const sess = allGeminiSessions[conversationId];
+        if (sess) currentRemark = sess.remark || '';
+      }
+      
+      // Fallback
+      if (!currentRemark) {
+        const sess = allRemarksSessions.find(s => s.conversation_id === conversationId);
+        if (sess) currentRemark = sess.remark || '';
+      }
+      
+      document.getElementById('remark-modal-textarea').value = currentRemark;
+      document.getElementById('session-remark-modal').classList.add('active');
+    }
+
+    function closeSessionRemarkModal() {
+      document.getElementById('session-remark-modal').classList.remove('active');
+    }
+
+    async function saveSessionRemark() {
+      const remark = document.getElementById('remark-modal-textarea').value.trim();
+      const payload = {
+        conversation_id: remarkModalTargetId,
+        type: remarkModalTargetType,
+        remark: remark
+      };
+      
+      try {
+        const res = await fetch('/api/session/remark', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.ok) {
+          closeSessionRemarkModal();
+          
+          // Update in local lists
+          if (remarkModalTargetType === 'nlm' && allNlmSessions[remarkModalTargetId]) {
+            allNlmSessions[remarkModalTargetId].remark = remark;
+            await loadNLMSessions(); // Re-render NLM sidebar
+          } else if (remarkModalTargetType === 'gemini' && allGeminiSessions[remarkModalTargetId]) {
+            allGeminiSessions[remarkModalTargetId].remark = remark;
+            await loadGeminiSessions(); // Re-render Gemini sidebar
+          }
+          
+          // Refresh Remarks pane if active
+          if (currentTab === 'remarks') {
+            await loadRemarksList();
+          }
+        } else {
+          alert('儲存備註失敗：' + data.error);
+        }
+      } catch (err) {
+        alert('連線失敗: ' + err.message);
+      }
+    }
+
+    async function viewTranscript(platform, conversationId, userName) {
+      const modal = document.getElementById('transcript-modal');
+      const title = document.getElementById('modal-title-text');
+      const body = document.getElementById('modal-body-content');
+
+      title.innerText = `對話明細 (${platform === 'notebooklm' ? 'NotebookLM' : 'Gemini'}) · 同仁: ${userName} · Session: ${conversationId}`;
+      body.innerHTML = '<div style="margin:auto; padding:40px;"><span class="spinner" style="color:var(--active-accent);"></span> 正在讀取完整歷史紀錄...</div>';
+      modal.style.display = 'flex';
+
+      try {
+        const url = platform === 'notebooklm' 
+          ? `/api/multichat/history?conversation_id=${conversationId}`
+          : `/api/gemini/history?conversation_id=${conversationId}`;
+
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.ok && data.turns) {
+          body.innerHTML = '';
+          data.turns.forEach(turn => {
+            const isUser = turn.role === 'user';
+            const card = document.createElement('div');
+            card.style.background = isUser ? 'hsla(220, 20%, 14%, 0.9)' : 'hsla(220, 25%, 8%, 0.8)';
+            card.style.border = '1px solid var(--card-border)';
+            card.style.padding = '16px';
+            card.style.borderRadius = '12px';
+            card.style.display = 'flex';
+            card.style.flexDirection = 'column';
+            card.style.gap = '8px';
+
+            card.innerHTML = `
+              <div style="display:flex; justify-content:space-between; border-bottom:1px solid hsla(0,0%,100%,0.05); padding-bottom:6px; font-size:0.75rem;">
+                <strong style="color:${isUser ? 'var(--accent-nlm)' : 'var(--accent-gemini)'};">
+                  ${isUser ? '👤 USER' : '🤖 AI ASSISTANT'}
+                </strong>
+                <span style="color:var(--text-muted);">${turn.timestamp}</span>
+              </div>
+              <div style="font-size:0.9rem; line-height:1.6; white-space:pre-wrap; word-break:break-word;">${escapeHTML(turn.content)}</div>
+            `;
+            body.appendChild(card);
+          });
+        } else {
+          body.innerHTML = `<div style="color:red; text-align:center; padding:20px;">載入對話紀錄失敗: ${data.error || '無紀錄內容'}</div>`;
+        }
+      } catch (err) {
+        body.innerHTML = `<div style="color:red; text-align:center; padding:20px;">連線失敗: ${err.message}</div>`;
+      }
+    }
+
+    function closeModal(event) {
+      if (event.target === document.getElementById('transcript-modal')) {
+        closeModalDirect();
+      }
+    }
+
+    function closeModalDirect() {
+      document.getElementById('transcript-modal').style.display = 'none';
+    }
+
+
+    // --- UI Helper Functions ---
+
+    function getNowTimeString() {
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    }
+
+    function scrollToBottom(elem) {
+      setTimeout(() => {
+        elem.scrollTop = elem.scrollHeight;
+      }, 50);
+    }
+
+    // Escape HTML Helper
+    function escapeHTML(str) {
+      if (!str) return '';
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Markdown Parser Helper for Chat Bubble rendering (Offline-friendly)
+    function renderMarkdownToHTML(text) {
+      if (!text) return '';
+      
+      let html = escapeHTML(text);
+
+      // Code blocks (```code```)
+      html = html.replace(/```([\s\S]+?)```/g, (match, p1) => {
+        return `<pre><code>${p1.trim()}</code></pre>`;
+      });
+
+      // Inline code (`code`)
+      html = html.replace(/`([^`\n]+?)`/g, '<code>$1</code>');
+
+      // Bold (**bold**)
+      html = html.replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>');
+
+      // Italic (*italic*)
+      html = html.replace(/\*([\s\S]+?)\*/g, '<em>$1</em>');
+
+      // Linebreaks to br
+      html = html.replace(/\n/g, '<br>');
+
+      return html;
+    }
+
+    // Append Message Bubble HTML
+    function appendMessageHTML(container, role, text, timestamp) {
+      const bubble = document.createElement('div');
+      bubble.className = `message-bubble ${role}`;
+      bubble.innerHTML = `
+        <div class="message-content">${renderMarkdownToHTML(text)}</div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 6px; gap: 10px; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 4px;">
+          <span class="message-meta" style="margin: 0; opacity: 0.6;">${timestamp}</span>
+          <button class="msg-copy-btn" onclick="copyMessageText(this)" data-text="${encodeURIComponent(text)}" style="background: none; border: none; color: inherit; opacity: 0.6; cursor: pointer; padding: 2px 6px; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 4px; transition: opacity 0.2s, background-color 0.2s; border-radius: 4px; margin-left: auto;" title="複製訊息" onmouseover="this.style.opacity='1'; this.style.background='rgba(255,255,255,0.08)';" onmouseout="this.style.opacity='0.6'; this.style.background='none';">
+            <svg class="copy-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: block;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            <svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span class="copy-text">複製</span>
+          </button>
+        </div>
+      `;
+      container.appendChild(bubble);
+    }
+
+    function copyMessageText(btn) {
+      const encodedText = btn.getAttribute('data-text');
+      const text = decodeURIComponent(encodedText);
+      navigator.clipboard.writeText(text).then(() => {
+        const copyIcon = btn.querySelector('.copy-icon');
+        const checkIcon = btn.querySelector('.check-icon');
+        const copyText = btn.querySelector('.copy-text');
+        
+        if (copyIcon && checkIcon) {
+          copyIcon.style.display = 'none';
+          checkIcon.style.display = 'block';
+        }
+        if (copyText) {
+          copyText.innerText = '已複製';
+        }
+        btn.style.opacity = '1';
+        
+        setTimeout(() => {
+          if (copyIcon && checkIcon) {
+            copyIcon.style.display = 'block';
+            checkIcon.style.display = 'none';
+          }
+          if (copyText) {
+            copyText.innerText = '複製';
+          }
+          btn.style.opacity = '0.6';
+        }, 1500);
+      }).catch(err => {
+        console.error("Failed to copy message text", err);
+        alert("複製失敗，請手動複製！");
+      });
+    }
+
+    function toggleLocalTokenVisibility(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '🙈';
+      } else {
+        input.type = 'password';
+        btn.textContent = '👁️';
+      }
+    }
+
+    // GAS functions removed (moved to admin.html)
+
+  </script>
+
+  <!-- Gemini Info Modal -->
+  <div class="confirm-modal-overlay" id="gemini-info-modal">
+    <div class="confirm-modal-card" style="max-width: 500px; padding: 24px;">
+      <h3 style="color: var(--accent-gemini); font-size: 1.15rem; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+        🤖 Gemini 3.x 系統模型機制與連結說明
+      </h3>
+      <div style="font-size: 0.82rem; line-height: 1.5; color: var(--text-main); display: flex; flex-direction: column; gap: 12px;">
+        <p><strong>1. 最新模型狀況：</strong></p>
+        <ul style="padding-left: 20px; color: var(--text-muted); margin: 0 0 5px 0; display: flex; flex-direction: column; gap: 4px;">
+          <li><strong style="color: var(--text-main);">3.1 Flash-Lite</strong>：回覆速度最快，適合簡單的常規性提問。</li>
+          <li><strong style="color: var(--text-main);">3.5 Flash</strong>：全方位協助模型，為本服務預設的核心 AI。</li>
+          <li><strong style="color: var(--text-main);">3.1 Pro</strong>：進階數學、程式設計與推論模型，性能最為強大。</li>
+        </ul>
+        
+        <p><strong>2. 思考程度機制 (Thinking Mode)：</strong></p>
+        <ul style="padding-left: 20px; color: var(--text-muted); margin: 0 0 5px 0; display: flex; flex-direction: column; gap: 4px;">
+          <li><strong>標準</strong>：常規的生成速度，適用一般提問。</li>
+          <li><strong>延長</strong>：給予較充足的生成處理資源，適用長回答。</li>
+          <li><strong style="color: #ff5252;">Deep Think (限 Pro 模型)</strong>：啟用平行多推論演算，消耗地端運算額度較高，且系統會對操作全程記錄以供安全合規審計。</li>
+        </ul>
+
+        <p><strong>3. 地端 Cookies 連線與隔離：</strong></p>
+        <p style="color: var(--text-muted); margin: 0;">本網關為 Local-First 設計，免申請付費 API Key。連線時，程式會自動從本機的 <code>config/storage_state.json</code> 中提取 Cookies 來維持與官方網頁版的安全連線，並利用獨立 Session ID 進行多用戶會話隔離。</p>
+
+        <p style="color: var(--text-muted); font-size: 0.75rem; border-top: 1px solid var(--card-border); padding-top: 10px; margin-top: 5px; font-family: monospace; margin-bottom: 0;">
+          📅 本機制最後更新日期：v2.01版 2026/06/14
+        </p>
+      </div>
+      <div class="confirm-actions" style="margin-top: 20px;">
+        <button class="btn-confirm-submit" style="background: var(--accent-gemini); color: #0d1117; width: 100%; justify-content: center; height: 38px;" onclick="closeGeminiInfoModal()">了解並關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NLM Query Confirmation Modal -->
+  <div class="confirm-modal-overlay" id="nlm-confirm-modal">
+    <div class="confirm-modal-card">
+      <h3>提問發送確認</h3>
+      <p class="muted">請確認您的提問資訊，以避免消耗地端佇列與執行時間：</p>
+      <div class="confirm-detail-row">
+        <span class="label">📖 筆記本:</span>
+        <span class="value" id="confirm-notebook-name"></span>
+      </div>
+      <div class="confirm-detail-row">
+        <span class="label">👤 提問者:</span>
+        <span class="value" id="confirm-user-name"></span>
+      </div>
+      <div class="confirm-detail-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+          <span class="label">💬 提問內容:</span>
+          <div class="preview-controls" style="display: flex; align-items: center; gap: 10px; font-size: 0.72rem; color: var(--text-muted);">
+            <div style="display: flex; align-items: center; gap: 2px;">
+              <span>字級:</span>
+              <button type="button" class="btn-action btn-font-dec" style="padding: 1px 5px; font-size: 0.65rem; margin: 0; min-width: 18px; line-height: 1;">-</button>
+              <button type="button" class="btn-action btn-font-inc" style="padding: 1px 5px; font-size: 0.65rem; margin: 0; min-width: 18px; line-height: 1;">+</button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 2px;">
+              <span>高度:</span>
+              <button type="button" class="btn-action btn-height-dec" style="padding: 1px 5px; font-size: 0.65rem; margin: 0; min-width: 18px; line-height: 1;">-</button>
+              <button type="button" class="btn-action btn-height-inc" style="padding: 1px 5px; font-size: 0.65rem; margin: 0; min-width: 18px; line-height: 1;">+</button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 3px;">
+              <span>配色:</span>
+              <span class="theme-swatch swatch-dark" title="暗夜黑" style="width: 10px; height: 10px; border-radius: 50%; background: #1a1a1a; border: 1px solid #666; cursor: pointer; display: inline-block;"></span>
+              <span class="theme-swatch swatch-cyber" title="科技藍" style="width: 10px; height: 10px; border-radius: 50%; background: #00f2fe; border: 1px solid #00c2de; cursor: pointer; display: inline-block;"></span>
+              <span class="theme-swatch swatch-amber" title="琥珀金" style="width: 10px; height: 10px; border-radius: 50%; background: #fbbf24; border: 1px solid #d97706; cursor: pointer; display: inline-block;"></span>
+            </div>
+          </div>
+        </div>
+        <div class="confirm-query-text" id="confirm-query-content"></div>
+      </div>
+      <div class="confirm-actions">
+        <button class="btn-cancel" onclick="closeNLMConfirmModal()">取消修改</button>
+        <button class="btn-confirm-submit" onclick="submitNLMConfirmedMessage()">🚀 確認發送</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gemini Query Confirmation Modal -->
+  <div class="confirm-modal-overlay" id="gemini-confirm-modal">
+    <div class="confirm-modal-card">
+      <h3>Gemini 提問發送確認</h3>
+      <p class="muted">請確認您的提問資訊，以避免消耗地端佇列與執行時間：</p>
+      
+      <div class="confirm-detail-row">
+        <span class="label">🤖 提問模型:</span>
+        <span class="value" id="gemini-confirm-model-name"></span>
+      </div>
+      <div class="confirm-detail-row">
+        <span class="label">💡 思考程度:</span>
+        <span class="value" id="gemini-confirm-thinking-name"></span>
+      </div>
+      <div class="confirm-detail-row">
+        <span class="label">👤 提問者:</span>
+        <span class="value" id="gemini-confirm-user-name"></span>
+      </div>
+      <div class="confirm-detail-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+          <span class="label">💬 提問內容:</span>
+          <div class="preview-controls" style="display: flex; align-items: center; gap: 10px; font-size: 0.72rem; color: var(--text-muted);">
+            <div style="display: flex; align-items: center; gap: 2px;">
+              <span>字級:</span>
+              <button type="button" class="btn-action btn-font-dec" style="padding: 1px 5px; font-size: 0.65rem; margin: 0; min-width: 18px; line-height: 1;">-</button>
+              <button type="button" class="btn-action btn-font-inc" style="padding: 1px 5px; font-size: 0.65rem; margin: 0; min-width: 18px; line-height: 1;">+</button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 2px;">
+              <span>高度:</span>
+              <button type="button" class="btn-action btn-height-dec" style="padding: 1px 5px; font-size: 0.65rem; margin: 0; min-width: 18px; line-height: 1;">-</button>
+              <button type="button" class="btn-action btn-height-inc" style="padding: 1px 5px; font-size: 0.65rem; margin: 0; min-width: 18px; line-height: 1;">+</button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 3px;">
+              <span>配色:</span>
+              <span class="theme-swatch swatch-dark" title="暗夜黑" style="width: 10px; height: 10px; border-radius: 50%; background: #1a1a1a; border: 1px solid #666; cursor: pointer; display: inline-block;"></span>
+              <span class="theme-swatch swatch-cyber" title="科技藍" style="width: 10px; height: 10px; border-radius: 50%; background: #00f2fe; border: 1px solid #00c2de; cursor: pointer; display: inline-block;"></span>
+              <span class="theme-swatch swatch-amber" title="琥珀金" style="width: 10px; height: 10px; border-radius: 50%; background: #fbbf24; border: 1px solid #d97706; cursor: pointer; display: inline-block;"></span>
+            </div>
+          </div>
+        </div>
+        <div class="confirm-query-text" id="gemini-confirm-query-content"></div>
+      </div>
+
+      <!-- Audit and Warning Banner -->
+      <div id="gemini-confirm-warning" style="margin-top: 12px; padding: 10px 12px; border-radius: 6px; font-size: 0.78rem; line-height: 1.4; display: none;"></div>
+
+      <!-- Consent Checkbox -->
+      <div id="gemini-confirm-disclaimer-wrapper" style="margin-top: 12px; display: none; align-items: center; gap: 8px;">
+        <input type="checkbox" id="gemini-confirm-disclaimer" onchange="handleGeminiDisclaimerChange()" style="cursor: pointer; width: 16px; height: 16px;">
+        <label for="gemini-confirm-disclaimer" style="font-size: 0.78rem; color: #ff5252; cursor: pointer; user-select: none; font-weight: bold;">我已閱讀上述聲明，了解額度消耗規範並同意記錄操作。</label>
+      </div>
+
+      <div class="confirm-actions" style="margin-top: 16px;">
+        <button class="btn-cancel" onclick="closeGeminiConfirmModal()">取消修改</button>
+        <button class="btn-confirm-submit" id="gemini-confirm-submit-btn" onclick="submitGeminiConfirmedMessage()">🚀 確認發送</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
