@@ -9,14 +9,14 @@
 ## 📂 版本目錄導覽
 
 ### 1. [v1/ (測試開發研究版)](file:///Users/force/Google_Antigravity/AI_NotebookLM/v1)
-*   **定位**：這兩天工作之前的最初靜態概念與學術架構展示版本。
+*   **定位**：專案最初的靜態概念與學術架構展示版本。
 *   **特色**：
     *   僅包含單檔前端 Portal 模擬與系統架構圖（不需啟動地端 Python 伺服器即可直接點開瀏覽）。
     *   內含傳統 single-file 的 HTML 實作研究。
 *   **線上 Pages 網址**：<https://falo-taiwan.github.io/ai-notebooklm/v1/index.html>
 
 ### 2. [v2/ (正式 POC/MVP 版)](file:///Users/force/Google_Antigravity/AI_NotebookLM/v2)
-*   **定位**：這兩天作業整合多用戶、多 Session 對話、Apps Script web 控制台與權限安全隔離的正式版本。
+*   **定位**：整合多用戶、多 Session 對話、Apps Script web 控制台與權限安全隔離的正式版本。
 *   **特色**：
     *   **地端 Runtime 伺服器**：採用多執行緒地端 Python 後端，提供對話、上傳排隊 (Task Queue) 與本地對帳審計。
     *   **智慧對話隔離**：同仁登入後僅能看到自己建立的 Session；管理員（Admin）可檢視全局審計日誌，但無法介入干擾同仁對話。

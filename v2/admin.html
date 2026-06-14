@@ -1911,14 +1911,19 @@
     let anonymousKeysList = [];
 
     async function loadUserSession() {
+      const isStaticPages = window.location.hostname.endsWith('github.io') || window.location.protocol === 'file:';
       try {
         const res = await fetch('/api/local-session');
         const data = await res.json();
         if (data.ok && data.session) {
           const sess = data.session;
           if (sess.role !== 'admin') {
-            window.location.href = '/admin.html'; // This triggers backend redirect to 403 page
-            return;
+            if (isStaticPages) {
+              setupStaticShowcaseBanner();
+            } else {
+              window.location.href = '/admin.html'; // This triggers backend redirect to 403 page
+              return;
+            }
           }
           currentUserId = sess.user_id;
           const profileEl = document.getElementById('user-profile-display');
@@ -1926,11 +1931,47 @@
             profileEl.textContent = `👑 ${sess.display_name}`;
           }
         } else {
-          window.location.href = '/';
+          if (isStaticPages) {
+            setupStaticShowcaseBanner();
+          } else {
+            window.location.href = '/';
+          }
         }
       } catch (err) {
         console.error('Failed to load session:', err);
-        window.location.href = '/';
+        if (isStaticPages) {
+          setupStaticShowcaseBanner();
+        } else {
+          window.location.href = '/';
+        }
+      }
+    }
+
+    function setupStaticShowcaseBanner() {
+      if (document.getElementById('static-showcase-banner')) return;
+      const banner = document.createElement('div');
+      banner.id = 'static-showcase-banner';
+      banner.style.position = 'fixed';
+      banner.style.top = '0';
+      banner.style.left = '0';
+      banner.style.width = '100%';
+      banner.style.background = '#eab308';
+      banner.style.color = '#000000';
+      banner.style.padding = '8px 16px';
+      banner.style.textAlign = 'center';
+      banner.style.fontWeight = '700';
+      banner.style.fontSize = '0.9rem';
+      banner.style.zIndex = '99999';
+      banner.style.boxShadow = '0 2px 10px rgba(0,0,0,0.5)';
+      banner.innerHTML = '⚠️ 提示：您正在瀏覽 GitHub Pages 靜態展示網頁。地端 Python 伺服器未啟動，無法執行實際對話或上傳。請於本機執行啟動檔進行完整功能體驗。';
+      document.body.appendChild(banner);
+      document.body.style.paddingTop = '38px';
+      
+      // Load a dummy admin session to prevent script errors
+      currentUserId = 'static_admin';
+      const profileEl = document.getElementById('user-profile-display');
+      if (profileEl) {
+        profileEl.textContent = '👑 管理員 (靜態展示)';
       }
     }
 
