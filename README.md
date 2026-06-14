@@ -53,3 +53,11 @@ cd v2
 ---
 
 © 2026 FALO x TAAT x Force Cheng. All rights reserved. 教學實戰示範專案。
+
+---
+
+## 📢 近期更新紀錄
+*   **GAS 雲地跳轉優化 (2026/06/15)**: 
+    *   將 GAS Web App 中，連回地端控制台的 `portal_url` 預設值由 `www.google.com.tw` 修改為 v2 雲端控制台 `https://falo-taiwan.github.io/ai-notebooklm/v2/gas-web.html`。
+    *   於 GAS 程式碼中實作了「防呆覆寫機制」：即使試算表中仍遺留舊版的 `google.com.tw` 資料，網頁前端也會自動判定並安全重導向至正確的控制台頁面。
+
