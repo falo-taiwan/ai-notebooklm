@@ -56,6 +56,15 @@ cd v2
 
 © 2026 FALO x TAAT x Force Cheng. All rights reserved. 教學實戰示範專案。
 
+## 💡 獨家防爬蟲突破技術 (TLS & HTTP/2 指紋偽裝)
+
+本專案實作了特殊的反爬蟲繞過技術，以解決地端 Python 模擬瀏覽器訪問 Google NotebookLM 時，被 Cloudflare 等 WAF 阻斷的問題：
+
+*   **問題背景**：標準 Python `requests` 或 `httpx` 在進行 TLS 握手時，使用的是系統的 OpenSSL 庫，這會產生特定的 **JA3/JA4 加密指紋**，與真實瀏覽器（如使用 BoringSSL 的 Chrome）不同，因而會被 Cloudflare 識別並回傳 `403 Forbidden`。
+*   **核心技術**：引進並依賴了 **`curl_cffi`**（基於底層 C 語言 `curl-impersonate`）。它在編譯時動態連結了瀏覽器專用的 SSL 庫，能字節級模擬 Chrome 120 的 TLS ClientHello 擴展順序（包含 GREASE 機制）及 HTTP/2 SETTINGS 幀特徵，成功偽裝成真實瀏覽器。
+*   **無感熱更新設計**：本專案採用子行程（Subprocess）動態調用 `gemini_helper.py`。由於每次提問皆啟動獨立 Python 行程，因此在 Windows 虛擬環境中手動補齊 `curl_cffi` 依賴後，**地端伺服器無需重啟即可立即生效**。
+*   **詳細原理網頁**：請參閱專案根目錄的 [TLS 指紋偽裝與防爬蟲突破技術指南 (tls_bypass_guide.html)](file:///Users/force/Google_Antigravity/AI_NotebookLM/tls_bypass_guide.html)。
+
 ---
 
 ## 📢 近期更新紀錄
