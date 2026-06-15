@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML-Extension-Cowork (HEC) | 零開埠跨網頁協作架構</title>
+    <meta name="description" content="Falo x Force Cheng 2026/6/15 ver0.1 零開埠、免伺服器 (Zero-Port, Zero-Server) Chrome 外掛雙向協作架構技術手冊">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* Modern CSS Reset & Variable Tokens */
+        :root {
+            --bg-color: hsl(224, 71%, 4%);
+            --card-bg: hsla(222, 47%, 11%, 0.75);
+            --card-border: hsla(217, 32%, 18%, 0.85);
+            --primary-glow: hsl(263, 90%, 65%);
+            --secondary-glow: hsl(190, 100%, 50%);
+            --text-main: hsl(210, 40%, 98%);
+            --text-muted: hsl(215, 20%, 65%);
+            --success-color: hsl(145, 80%, 45%);
+            --accent-gradient: linear-gradient(135deg, hsl(263, 90%, 65%) 0%, hsl(190, 100%, 50%) 100%);
+            --glass-gradient: linear-gradient(135deg, hsla(222, 47%, 11%, 0.8) 0%, hsla(222, 47%, 7%, 0.9) 100%);
+            --font-outfit: 'Outfit', 'Inter', sans-serif;
+            --font-inter: 'Inter', sans-serif;
+            --shadow-neon: 0 0 30px hsla(263, 90%, 65%, 0.15), 0 0 10px hsla(190, 100%, 50%, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-inter);
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, hsla(263, 90%, 65%, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, hsla(190, 100%, 50%, 0.08) 0%, transparent 45%);
+            background-attachment: fixed;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-color);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--card-border);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-glow);
+        }
+
+        /* Container & Grid Setup */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* Header / Navigation */
+        header {
+            padding: 2rem 0;
+            border-bottom: 1px solid var(--card-border);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: hsla(224, 71%, 4%, 0.7);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-family: var(--font-outfit);
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo::before {
+            content: '⚡';
+            font-size: 1.3rem;
+        }
+
+        .version-badge {
+            background: hsla(190, 100%, 50%, 0.15);
+            border: 1px solid var(--secondary-glow);
+            color: var(--secondary-glow);
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            font-family: var(--font-outfit);
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 5rem 0 3rem 0;
+            text-align: center;
+            position: relative;
+        }
+
+        .hero h1 {
+            font-family: var(--font-outfit);
+            font-size: 3.5rem;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            letter-spacing: -1px;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            max-width: 800px;
+            margin: 0 auto 2.5rem auto;
+            font-weight: 300;
+        }
+
+        /* Tabs Interface */
+        .tab-section {
+            margin-bottom: 4rem;
+        }
+
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2.5rem;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 1rem;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-family: var(--font-outfit);
+            font-size: 1.1rem;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .tab-btn::after {
+            content: '';
+            position: absolute;
+            bottom: -1rem;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: var(--accent-gradient);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .tab-btn.active {
+            color: var(--text-main);
+        }
+
+        .tab-btn.active::after {
+            transform: scaleX(1);
+        }
+
+        .tab-btn:hover {
+            color: var(--text-main);
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Glassmorphic Cards */
+        .card {
+            background: var(--glass-gradient);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 2.5rem;
+            backdrop-filter: blur(8px);
+            box-shadow: var(--shadow-neon);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: hsla(263, 90%, 65%, 0.4);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--accent-gradient);
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        /* Flow Diagrams (Pure CSS/HTML) */
+        .flow-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            margin: 3rem 0;
+            padding: 2rem;
+            background: hsla(222, 47%, 8%, 0.5);
+            border-radius: 12px;
+            border: 1px dashed var(--card-border);
+            gap: 1.5rem;
+        }
+
+        .flow-node {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            padding: 1.25rem 2rem;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: 600;
+            min-width: 160px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .flow-node:hover {
+            border-color: var(--secondary-glow);
+            box-shadow: 0 0 15px hsla(190, 100%, 50%, 0.3);
+            transform: scale(1.05);
+        }
+
+        .flow-arrow {
+            font-size: 1.5rem;
+            color: var(--primary-glow);
+            animation: pulseArrow 1.5s infinite ease-in-out;
+        }
+
+        @keyframes pulseArrow {
+            0%, 100% { transform: translateX(0); opacity: 0.6; }
+            50% { transform: translateX(5px); opacity: 1; }
+        }
+
+        /* Features Section */
+        .benefits {
+            margin-bottom: 5rem;
+        }
+
+        .benefit-title {
+            text-align: center;
+            font-family: var(--font-outfit);
+            font-size: 2.2rem;
+            margin-bottom: 3rem;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .benefit-card {
+            background: hsla(222, 47%, 8%, 0.6);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .benefit-card:hover {
+            border-color: var(--primary-glow);
+            box-shadow: 0 0 20px hsla(263, 90%, 65%, 0.1);
+        }
+
+        .benefit-card h3 {
+            font-family: var(--font-outfit);
+            font-size: 1.4rem;
+            margin-bottom: 1rem;
+            color: var(--secondary-glow);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .benefit-card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* Comparison Table */
+        .table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            margin-top: 2rem;
+            border-radius: 12px;
+            border: 1px solid var(--card-border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: hsla(222, 47%, 6%, 0.4);
+            text-align: left;
+        }
+
+        th, td {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        th {
+            background: hsla(222, 47%, 9%, 0.8);
+            font-family: var(--font-outfit);
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background: hsla(222, 47%, 12%, 0.3);
+        }
+
+        /* Footer */
+        footer {
+            border-top: 1px solid var(--card-border);
+            padding: 3rem 0;
+            text-align: center;
+            margin-top: 6rem;
+            background: hsla(224, 71%, 2%, 0.8);
+            position: relative;
+        }
+
+        .footer-logo {
+            font-family: var(--font-outfit);
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+
+        .footer-sig {
+            font-family: var(--font-outfit);
+            font-size: 0.9rem;
+            color: var(--secondary-glow);
+            margin-bottom: 0.5rem;
+            letter-spacing: 0.5px;
+        }
+
+        .footer-copyright {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Custom Interactive elements */
+        .badge {
+            background: hsla(145, 80%, 45%, 0.15);
+            color: var(--success-color);
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+
+        .badge.blue {
+            background: hsla(190, 100%, 50%, 0.15);
+            color: var(--secondary-glow);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="container header-content">
+            <div class="logo">HTML-Extension-Cowork</div>
+            <div class="version-badge">ver 0.1</div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Hero Section -->
+        <section class="hero">
+            <h1>零開埠雙軌 AI 協作引擎</h1>
+            <p>融合地端 Python 原生通訊與瀏覽器外掛的「零開埠、免伺服器 (Zero-Port, Zero-Server)」架構。無痛繞過 WAF 阻擋與內網防火牆限制，開啟雲地協作新次元。</p>
+        </section>
+
+        <!-- Tabs Section -->
+        <section class="tab-section">
+            <div class="tabs">
+                <button id="tab1" class="tab-btn active" onclick="switchTab('concept1')">想法一：純外掛 + Python Native</button>
+                <button id="tab2" class="tab-btn" onclick="switchTab('concept2')">想法二：組合拳 HEC (雙分頁監聽)</button>
+            </div>
+
+            <!-- Concept 1 Content -->
+            <div id="concept1" class="tab-content active">
+                <div class="card">
+                    <span class="badge">Pure Extension Mode</span>
+                    <h2>純外掛與地端 Python (Native Messaging) 連接</h2>
+                    <p style="margin: 1rem 0; color: var(--text-muted);">
+                        此架構免去傳統在本機啟動 WebSocket/HTTP 監聽埠的需求。外掛程式利用 Chrome 底層的系統原生通訊（Native Messaging）機制，直接透過系統管道啟動並調度 Python 進程。
+                    </p>
+
+                    <!-- Flow Diagram -->
+                    <div class="flow-container">
+                        <div class="flow-node">Chrome Popup UI</div>
+                        <div class="flow-arrow">➔</div>
+                        <div class="flow-node" style="border-color: var(--primary-glow);">Service Worker 大腦</div>
+                        <div class="flow-arrow">➔</div>
+                        <div class="flow-node">Native Msg (Stdio)</div>
+                        <div class="flow-arrow">➔</div>
+                        <div class="flow-node" style="border-color: var(--secondary-glow);">Python (本地行程)</div>
+                    </div>
+
+                    <div class="card-grid">
+                        <div class="benefit-card">
+                            <h3>🤖 零 Port 安全通訊</h3>
+                            <p>地端 Python 腳本不需要開埠 (No port binding)，免受 Windows/Mac 本地防火牆阻攔及 Port 衝突的困擾。</p>
+                        </div>
+                        <div class="benefit-card">
+                            <h3>⚡ 行程自動管理</h3>
+                            <p>Python 行程由 Chrome 引擎自動孵化與回收。外掛關閉時，Chrome 會自動中斷 Stdio 管道並殺死進程，防止背景殭屍行程堆積。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Concept 2 Content -->
+            <div id="concept2" class="tab-content">
+                <div class="card">
+                    <span class="badge blue">HEC Combo Mode</span>
+                    <h2>雙分頁監聽組合拳 (HTML Portal + Chrome Extension)</h2>
+                    <p style="margin: 1rem 0; color: var(--text-muted);">
+                        這是一個極為強大的混合架構。外掛 Service Worker 作為訊息調度核心，同時連通「本地控制網頁 (index.html)」與「AI SaaS 官方分頁 (如 ChatGPT/Claude)」，進行零伺服器開銷的雙向數據同步。
+                    </p>
+
+                    <!-- Flow Diagram -->
+                    <div class="flow-container">
+                        <div class="flow-node" style="border-color: var(--secondary-glow);">本地 Portal (index.html)</div>
+                        <div class="flow-arrow">⇄</div>
+                        <div class="flow-node" style="border-color: var(--primary-glow);">外掛 SW 中介大腦</div>
+                        <div class="flow-arrow">⇄</div>
+                        <div class="flow-node">目標 AI 官網分頁</div>
+                        <div class="flow-arrow">⇄</div>
+                        <div class="flow-node">地端 Python</div>
+                    </div>
+
+                    <div class="card-grid">
+                        <div class="benefit-card">
+                            <h3>👁️ 雙向 DOM 自動化</h3>
+                            <p>外掛藉由 content-scripts 同時注入兩個分頁。當 Portal 按下執行，外掛會自動定位 AI 頁面、模擬填入與發送，並以 MutationObserver 抓取輸出回傳。</p>
+                        </div>
+                        <div class="benefit-card">
+                            <h3>🛡️ 100% 避開防爬蟲 WAF</h3>
+                            <p>由於所有模擬操作都在真實登入的瀏覽器 Tab 中進行，WAF 判定為真實人類操作，免除繞過 Cloudflare 時頻繁出現 403 阻擋的問題。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Technical Comparison -->
+        <section class="benefits">
+            <h2 class="benefit-title">兩種通訊架構大比拼</h2>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>評估維度</th>
+                            <th>傳統地端伺服器 (HTTP/WS)</th>
+                            <th>全新零開埠架構 (HEC Native)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>開部限制 (Port Binding)</strong></td>
+                            <td style="color: var(--text-muted);">需常駐佔用 Port（如 8765）。容易被防火牆或資安軟體封鎖。</td>
+                            <td style="color: var(--success-color); font-weight: 600;">免開 Port。全部在瀏覽器 IPC 及系統 Stdio 中安全執行。</td>
+                        </tr>
+                        <tr>
+                            <td><strong>防爬蟲 WAF 繞過</strong></td>
+                            <td style="color: var(--text-muted);">需繁瑣模擬 TLS 指紋（如 JA3）。遇強烈 WAF 時容易遭 403 阻斷。</td>
+                            <td style="color: var(--success-color); font-weight: 600;">100% 真人指紋。直接乘載於真實已登入的瀏覽器 Tab 內。</td>
+                        </tr>
+                        <tr>
+                            <td><strong>部署便利性</strong></td>
+                            <td style="color: var(--text-muted);">使用者需要安裝複雜 Python 依賴，設定跨域資源共享 (CORS) 策略。</td>
+                            <td style="color: var(--success-color); font-weight: 600;">外掛一鍵載入，結合 Native Host 登錄即可運作，實現 Plug & Play。</td>
+                        </tr>
+                        <tr>
+                            <td><strong>進程生命週期</strong></td>
+                            <td style="color: var(--text-muted);">地端進程需手動管理。若當機或不正常關閉，可能殘留背景殭屍進程。</td>
+                            <td style="color: var(--success-color); font-weight: 600;">由 Chrome 瀏覽器生命週期強制託管。隨瀏覽器關閉自動清理。</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-logo">HTML-Extension-Cowork Project</div>
+            <div class="footer-sig">Falo x Force Cheng 2026/6/15 ver0.1</div>
+            <div class="footer-copyright">© 2026 Falo x TAAT x Force Cheng. All rights reserved. 技術概念實戰手冊。</div>
+        </div>
+    </footer>
+
+    <!-- Tab Switching Script -->
+    <script>
+        function switchTab(tabId) {
+            // Hide all contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            // Deactivate all buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            // Activate target content
+            document.getElementById(tabId).classList.add('active');
+            // Activate corresponding button
+            if (tabId === 'concept1') {
+                document.getElementById('tab1').classList.add('active');
+            } else {
+                document.getElementById('tab2').classList.add('active');
+            }
+        }
+    </script>
+</body>
+</html>
