@@ -58,6 +58,117 @@ SESSION_DB = {}
 
 import queue
 import uuid
+import base64
+import hashlib
+
+def get_websocket_accept_key(sec_key: str) -> str:
+    GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+    hash_val = hashlib.sha1((sec_key + GUID).encode("utf-8")).digest()
+    return base64.b64encode(hash_val).decode("utf-8")
+
+class ChromeNodeManager:
+    def __init__(self):
+        self.active_node = None
+        self.lock = threading.Lock()
+        self.pending_requests = {} # task_id -> {"event": Event, "result": None}
+        
+    def register_node(self, node_handler):
+        with self.lock:
+            if self.active_node and self.active_node != node_handler:
+                try:
+                    self.active_node.connection.close()
+                except Exception:
+                    pass
+            self.active_node = node_handler
+            print(f"[WS] Chrome node registered: {node_handler.client_address}")
+            
+    def unregister_node(self, node_handler):
+        with self.lock:
+            if self.active_node == node_handler:
+                self.active_node = None
+                print(f"[WS] Chrome node disconnected: {node_handler.client_address}")
+                
+    def is_connected(self) -> bool:
+        with self.lock:
+            return self.active_node is not None
+            
+    def send_task(self, task_id: str, platform: str, prompt: str, notebook_id: str = "") -> dict:
+        node = None
+        with self.lock:
+            node = self.active_node
+            
+        if not node:
+            return {"ok": False, "error": "沒有連接 Chrome Extension 節點。請先開啟 Chrome 並載入外掛。"}
+            
+        event = threading.Event()
+        with self.lock:
+            self.pending_requests[task_id] = {"event": event, "result": None}
+            
+        msg = {
+            "action": "ask",
+            "id": task_id,
+            "platform": platform,
+            "prompt": prompt
+        }
+        if notebook_id:
+            msg["notebook_id"] = notebook_id
+        
+        try:
+            node.send_ws_frame(1, json.dumps(msg).encode("utf-8"))
+        except Exception as e:
+            with self.lock:
+                if task_id in self.pending_requests:
+                    del self.pending_requests[task_id]
+            return {"ok": False, "error": f"發送任務至外掛失敗: {e}"}
+            
+        completed = event.wait(timeout=300.0)
+        
+        result = None
+        with self.lock:
+            if task_id in self.pending_requests:
+                result = self.pending_requests[task_id]["result"]
+                del self.pending_requests[task_id]
+                
+        if not completed:
+            return {"ok": False, "error": "Chrome 節點處理逾時 (300秒)"}
+            
+        if not result:
+            return {"ok": False, "error": "Chrome 節點未返回任何結果"}
+            
+        return result
+        
+    def handle_message(self, message_str: str):
+        try:
+            data = json.loads(message_str)
+            action = data.get("action")
+            if action == "response":
+                task_id = data.get("id")
+                ok = data.get("ok", False)
+                answer = data.get("answer", "")
+                error = data.get("error", "Unknown extension error")
+                
+                with self.lock:
+                    if task_id in self.pending_requests:
+                        self.pending_requests[task_id]["result"] = {
+                            "ok": ok,
+                            "answer": answer,
+                            "error": error if not ok else None
+                        }
+                        self.pending_requests[task_id]["event"].set()
+            elif action == "heartbeat":
+                node = None
+                with self.lock:
+                    node = self.active_node
+                if node:
+                    try:
+                        node.send_ws_frame(1, json.dumps({"action": "heartbeat_ack"}).encode("utf-8"))
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"[WS] Error parsing message: {e}")
+
+chrome_node_manager = ChromeNodeManager()
+
 
 class TaskQueueManager:
     def __init__(self, config: AppConfig):
@@ -216,9 +327,18 @@ class TaskQueueManager:
                 payload = task["payload"]
                 
                 if platform == "notebooklm":
-                    result = self._run_notebooklm(payload)
-                else:
+                    if chrome_node_manager.is_connected():
+                        result = self._run_chrome(task_id, payload)
+                    else:
+                        result = self._run_notebooklm(payload)
+                elif platform == "gemini":
                     result = self._run_gemini(payload)
+                elif platform in ("chatgpt", "claude"):
+                    result = self._run_chrome(task_id, payload)
+                elif platform == "cowork":
+                    result = self._run_cowork(task_id, payload)
+                else:
+                    result = {"ok": False, "error": f"Unsupported platform: {platform}"}
 
                 elapsed = time.time() - task["started_at"]
                 
@@ -414,6 +534,204 @@ class TaskQueueManager:
             "answer": answer,
             "metadata": json.dumps(resolved_metadata)
         }
+
+    def _run_chrome(self, task_id: str, payload: dict) -> dict:
+        user_name = payload["user_name"]
+        user_id = payload.get("user_id", "")
+        question = payload["question"]
+        platform = payload.get("platform", "chatgpt")
+        conversation_id = payload.get("conversation_id", "")
+        notebook_id = payload.get("notebook_id", "")
+        notebook_title = payload.get("notebook_title", "")
+        
+        result = chrome_node_manager.send_task(task_id, platform, question, notebook_id)
+        if not result.get("ok"):
+            return result
+            
+        answer = result["answer"]
+        resolved_conv_id = conversation_id if conversation_id else f"conv_{uuid.uuid4().hex[:12]}"
+        
+        with self.lock:
+            if platform == "notebooklm":
+                sessions_file = PROJECT_ROOT / "data" / "multichat_sessions.json"
+            else:
+                sessions_file = PROJECT_ROOT / "data" / "chrome_sessions.json"
+                
+            data = {"sessions": {}}
+            if sessions_file.exists():
+                try:
+                    with open(sessions_file, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                except Exception:
+                    pass
+            
+            if "sessions" not in data:
+                data["sessions"] = {}
+                
+            now_str = datetime.now(TAIPEI_TZ).strftime("%Y-%m-%d %H:%M:%S")
+            
+            if resolved_conv_id not in data["sessions"]:
+                if platform == "notebooklm":
+                    data["sessions"][resolved_conv_id] = {
+                        "user_id": user_id,
+                        "user_name": user_name,
+                        "notebook_id": notebook_id,
+                        "notebook_title": notebook_title,
+                        "created_at": now_str,
+                        "last_query_at": now_str,
+                        "turns": []
+                    }
+                else:
+                    data["sessions"][resolved_conv_id] = {
+                        "user_id": user_id,
+                        "user_name": user_name,
+                        "platform": platform,
+                        "created_at": now_str,
+                        "last_query_at": now_str,
+                        "turns": []
+                    }
+            else:
+                data["sessions"][resolved_conv_id]["last_query_at"] = now_str
+                data["sessions"][resolved_conv_id]["user_name"] = user_name
+                if platform == "notebooklm":
+                    data["sessions"][resolved_conv_id]["notebook_id"] = notebook_id
+                    data["sessions"][resolved_conv_id]["notebook_title"] = notebook_title
+                
+            if platform == "notebooklm":
+                data["sessions"][resolved_conv_id]["turns"].append({
+                    "role": "user",
+                    "content": question,
+                    "timestamp": now_str,
+                    "notebook_id": notebook_id,
+                    "notebook_title": notebook_title
+                })
+                data["sessions"][resolved_conv_id]["turns"].append({
+                    "role": "assistant",
+                    "content": answer,
+                    "timestamp": now_str,
+                    "notebook_id": notebook_id,
+                    "notebook_title": notebook_title
+                })
+            else:
+                data["sessions"][resolved_conv_id]["turns"].append({
+                    "role": "user",
+                    "content": question,
+                    "timestamp": now_str
+                })
+                data["sessions"][resolved_conv_id]["turns"].append({
+                    "role": "assistant",
+                    "content": answer,
+                    "timestamp": now_str
+                })
+            
+            sessions_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(sessions_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+                
+        return {
+            "ok": True,
+            "answer": answer,
+            "conversation_id": resolved_conv_id
+        }
+
+    def _run_cowork(self, task_id: str, payload: dict) -> dict:
+        user_name = payload["user_name"]
+        user_id = payload.get("user_id", "")
+        question = payload["question"]
+        cowork_prompt = payload["cowork_prompt"]
+        cowork_platform = payload.get("cowork_platform", "chatgpt")
+        notebook_id = payload["notebook_id"]
+        notebook_title = payload.get("notebook_title", "")
+        conversation_id = payload.get("conversation_id", "")
+        
+        # Step 1: Run NotebookLM search
+        nlm_payload = {
+            "notebook_id": notebook_id,
+            "notebook_title": notebook_title,
+            "user_name": user_name,
+            "user_id": user_id,
+            "conversation_id": "new",
+            "question": question
+        }
+        
+        nlm_result = self._run_notebooklm(nlm_payload)
+        if not nlm_result.get("ok"):
+            return {"ok": False, "error": f"NotebookLM 檢索失敗: {nlm_result.get('error')}"}
+            
+        nlm_answer = nlm_result["answer"]
+        
+        # Step 2: Combine prompt
+        combined_prompt = (
+            f"以下是從 NotebookLM 知識庫中檢索出的參考資料：\n"
+            f"--------------------------------------------\n"
+            f"{nlm_answer}\n"
+            f"--------------------------------------------\n\n"
+            f"請根據上述參考資料，執行以下協作處理指令：\n"
+            f"{cowork_prompt}"
+        )
+        
+        # Step 3: Run Chrome node task
+        result = chrome_node_manager.send_task(task_id, cowork_platform, combined_prompt)
+        if not result.get("ok"):
+            return {"ok": False, "error": f"Chrome 節點協作失敗: {result.get('error')}", "nlm_answer": nlm_answer}
+            
+        answer = result["answer"]
+        resolved_conv_id = conversation_id if conversation_id else f"conv_{uuid.uuid4().hex[:12]}"
+        
+        with self.lock:
+            sessions_file = PROJECT_ROOT / "data" / "chrome_sessions.json"
+            data = {"sessions": {}}
+            if sessions_file.exists():
+                try:
+                    with open(sessions_file, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                except Exception:
+                    pass
+            
+            if "sessions" not in data:
+                data["sessions"] = {}
+                
+            now_str = datetime.now(TAIPEI_TZ).strftime("%Y-%m-%d %H:%M:%S")
+            
+            if resolved_conv_id not in data["sessions"]:
+                data["sessions"][resolved_conv_id] = {
+                    "user_id": user_id,
+                    "user_name": user_name,
+                    "platform": "cowork",
+                    "cowork_platform": cowork_platform,
+                    "notebook_id": notebook_id,
+                    "notebook_title": notebook_title,
+                    "created_at": now_str,
+                    "last_query_at": now_str,
+                    "turns": []
+                }
+            else:
+                data["sessions"][resolved_conv_id]["last_query_at"] = now_str
+                data["sessions"][resolved_conv_id]["user_name"] = user_name
+                
+            data["sessions"][resolved_conv_id]["turns"].append({
+                "role": "user",
+                "content": f"[NotebookLM 檢索提問]：{question}\n[Chrome 協作指令]：{cowork_prompt}",
+                "timestamp": now_str
+            })
+            data["sessions"][resolved_conv_id]["turns"].append({
+                "role": "assistant",
+                "content": answer,
+                "nlm_answer": nlm_answer,
+                "timestamp": now_str
+            })
+            
+            sessions_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(sessions_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+                
+        return {
+            "ok": True,
+            "answer": answer,
+            "nlm_answer": nlm_answer,
+            "conversation_id": resolved_conv_id
+        }
+
 
 task_queue_manager: TaskQueueManager | None = None
 
@@ -3936,7 +4254,15 @@ def make_handler(config: AppConfig):
                     self._send_json({"ok": False, "error": "Conversation ID and type are required."})
                     return
                 
-                filename = "multichat_sessions.json" if sess_type == "nlm" else "gemini_sessions.json"
+                if sess_type == "nlm":
+                    filename = "multichat_sessions.json"
+                elif sess_type == "gemini":
+                    filename = "gemini_sessions.json"
+                elif sess_type == "chrome":
+                    filename = "chrome_sessions.json"
+                else:
+                    self._send_json({"ok": False, "error": f"Invalid session type: {sess_type}"})
+                    return
                 sessions_file = Path(config.project_root) / "data" / filename
                 
                 sessions_data = {"sessions": {}}
@@ -4378,6 +4704,106 @@ def make_handler(config: AppConfig):
                         pass
                 
                 self._send_json({"ok": True})
+            elif parsed.path == "/api/chrome/ask":
+                content_length = int(self.headers.get("Content-Length", 0))
+                post_data = self.rfile.read(content_length).decode("utf-8")
+                from urllib.parse import parse_qs
+                params = parse_qs(post_data)
+                user_name = params.get("user_name", [""])[0].strip()
+                question = params.get("question", [""])[0].strip()
+                platform = params.get("platform", ["chatgpt"])[0].strip()
+                conversation_id = params.get("conversation_id", [""])[0].strip()
+                
+                cowork_prompt = params.get("cowork_prompt", [""])[0].strip()
+                cowork_platform = params.get("cowork_platform", ["chatgpt"])[0].strip()
+                notebook_id = params.get("notebook_id", [""])[0].strip()
+                notebook_title = params.get("notebook_title", [""])[0].strip()
+
+                sess = self._get_current_session()
+                user_id = sess.get("user_id") if sess else "unknown_user"
+                active_user_name = sess.get("display_name") if (sess and sess.get("display_name")) else user_name
+
+                if not active_user_name or not question:
+                    self._send_json({"ok": False, "error": "User Name and Question/Prompt are required."})
+                    return
+
+                if conversation_id and conversation_id not in {"new", "[]", "null"}:
+                    sessions_file = Path(config.project_root) / "data" / "chrome_sessions.json"
+                    if sessions_file.exists():
+                        try:
+                            with open(sessions_file, "r", encoding="utf-8") as f:
+                                data = json.load(f)
+                            if "sessions" in data and conversation_id in data["sessions"]:
+                                session_info = data["sessions"][conversation_id]
+                                owner_id = session_info.get("user_id")
+                                owner_name = session_info.get("user_name")
+                                is_owner = (owner_id == user_id) or (not owner_id and owner_name == active_user_name)
+                                if not is_owner:
+                                    self._send_json({"ok": False, "error": "Access denied: cannot participate in a session belonging to another user."})
+                                    return
+                        except Exception:
+                            pass
+                            
+                if not chrome_node_manager.is_connected():
+                    self._send_json({"ok": False, "error": "沒有連接 Chrome Extension 節點。請確保 Chrome 外掛已載入且顯示 Connected 🟢"})
+                    return
+
+                payload = {
+                    "user_name": active_user_name,
+                    "user_id": user_id,
+                    "question": question,
+                    "platform": platform,
+                    "conversation_id": conversation_id if conversation_id != "new" else "",
+                    "cowork_prompt": cowork_prompt,
+                    "cowork_platform": cowork_platform,
+                    "notebook_id": notebook_id,
+                    "notebook_title": notebook_title
+                }
+                task_id = task_queue_manager.add_task(platform, active_user_name, payload)
+                detail = task_queue_manager.get_task_status_detail(task_id)
+                self._send_json({
+                    "ok": True,
+                    "task_id": task_id,
+                    "status": "pending",
+                    "queue_position": detail.get("queue_position", 0),
+                    "eta_seconds": detail.get("eta_seconds", 0)
+                })
+            elif parsed.path == "/api/chrome/delete":
+                content_length = int(self.headers.get("Content-Length", 0))
+                post_data = self.rfile.read(content_length).decode("utf-8")
+                from urllib.parse import parse_qs
+                params = parse_qs(post_data)
+                conversation_id = params.get("conversation_id", [""])[0].strip()
+
+                if not conversation_id:
+                    self._send_json({"ok": False, "error": "Conversation ID is required."})
+                    return
+
+                sess = self._get_current_session()
+                current_user_id = sess.get("user_id") if sess else None
+                current_display_name = sess.get("display_name") if sess else None
+                current_role = sess.get("role") if sess else "user"
+
+                sessions_file = Path(config.project_root) / "data" / "chrome_sessions.json"
+                if sessions_file.exists():
+                    try:
+                        with open(sessions_file, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                        if "sessions" in data and conversation_id in data["sessions"]:
+                            session_info = data["sessions"][conversation_id]
+                            if current_role != "admin":
+                                owner_id = session_info.get("user_id")
+                                owner_name = session_info.get("user_name")
+                                is_owner = (owner_id == current_user_id) or (not owner_id and owner_name == current_display_name)
+                                if not is_owner:
+                                    self._send_json({"ok": False, "error": "Access denied: cannot delete session belonging to another user."})
+                                    return
+                            del data["sessions"][conversation_id]
+                            with open(sessions_file, "w", encoding="utf-8") as f:
+                                json.dump(data, f, ensure_ascii=False, indent=2)
+                    except Exception:
+                        pass
+                self._send_json({"ok": True})
             else:
                 self.send_error(404, "Not found")
 
@@ -4392,6 +4818,83 @@ def make_handler(config: AppConfig):
             if parsed.path.startswith("/v2/"):
                 parsed = parsed._replace(path=parsed.path[3:])
             
+            if parsed.path == "/ws/node":
+                if "websocket" in self.headers.get("Upgrade", "").lower():
+                    sec_key = self.headers.get("Sec-WebSocket-Key")
+                    if not sec_key:
+                        self.send_error(400, "Missing Sec-WebSocket-Key")
+                        return
+                    
+                    accept_val = get_websocket_accept_key(sec_key)
+                    self.send_response(101, "Switching Protocols")
+                    self.send_header("Upgrade", "websocket")
+                    self.send_header("Connection", "Upgrade")
+                    self.send_header("Sec-WebSocket-Accept", accept_val)
+                    self.end_headers()
+                    
+                    self.ws_write_lock = threading.Lock()
+                    
+                    def send_ws_frame(opcode, payload_bytes):
+                        header = bytearray()
+                        header.append(0x80 | opcode)
+                        plen = len(payload_bytes)
+                        if plen < 126:
+                            header.append(plen)
+                        elif plen <= 65535:
+                            header.append(126)
+                            header.extend(plen.to_bytes(2, 'big'))
+                        else:
+                            header.append(127)
+                            header.extend(plen.to_bytes(8, 'big'))
+                        with self.ws_write_lock:
+                            self.connection.sendall(header + payload_bytes)
+                            
+                    self.send_ws_frame = send_ws_frame
+                    
+                    chrome_node_manager.register_node(self)
+                    try:
+                        while True:
+                            h = self.rfile.read(2)
+                            if not h or len(h) < 2:
+                                break
+                            b1, b2 = h[0], h[1]
+                            fin = (b1 & 0x80) != 0
+                            opcode = b1 & 0x0F
+                            masked = (b2 & 0x80) != 0
+                            plen = b2 & 0x7F
+                            
+                            if plen == 126:
+                                plen_bytes = self.rfile.read(2)
+                                if len(plen_bytes) < 2: break
+                                plen = int.from_bytes(plen_bytes, 'big')
+                            elif plen == 127:
+                                plen_bytes = self.rfile.read(8)
+                                if len(plen_bytes) < 8: break
+                                plen = int.from_bytes(plen_bytes, 'big')
+                                
+                            if masked:
+                                mask_key = self.rfile.read(4)
+                                if len(mask_key) < 4: break
+                                
+                            payload = self.rfile.read(plen)
+                            if len(payload) < plen: break
+                            
+                            if masked:
+                                payload = bytes(b ^ mask_key[i % 4] for i, b in enumerate(payload))
+                                
+                            if opcode == 8:
+                                break
+                            elif opcode == 9:
+                                self.send_ws_frame(10, payload)
+                            elif opcode == 1:
+                                text_data = payload.decode('utf-8')
+                                chrome_node_manager.handle_message(text_data)
+                    except Exception as e:
+                        print(f"[WS] Exception in client loop: {e}")
+                    finally:
+                        chrome_node_manager.unregister_node(self)
+                    return
+
             if parsed.path == "/api/status":
                 self._send_json(build_status_payload(config))
                 return
@@ -5042,6 +5545,95 @@ def make_handler(config: AppConfig):
                 current_role = sess.get("role") if sess else "user"
 
                 sessions_file = Path(config.project_root) / "data" / "gemini_sessions.json"
+                import json
+                turns = []
+                if sessions_file.exists():
+                    try:
+                        with open(sessions_file, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                        if "sessions" in data and conversation_id in data["sessions"]:
+                            session_info = data["sessions"][conversation_id]
+                            if current_role != "admin":
+                                owner_id = session_info.get("user_id")
+                                owner_name = session_info.get("user_name")
+                                is_owner = (owner_id == current_user_id) or (not owner_id and owner_name == current_display_name)
+                                if not is_owner:
+                                    self._send_json({"ok": False, "error": "Access denied: this session belongs to another user."})
+                                    return
+                            turns = session_info.get("turns", [])
+                    except Exception:
+                        pass
+                self._send_json({"ok": True, "turns": turns})
+            elif parsed.path == "/api/chrome/status":
+                connected = chrome_node_manager.is_connected()
+                active_list = task_queue_manager.get_active_tasks() if task_queue_manager else []
+                chrome_tasks = [t for t in active_list if t["platform"] in ("chatgpt", "claude", "cowork")]
+                self._send_json({
+                    "ok": True,
+                    "connected": connected,
+                    "queue": chrome_tasks,
+                    "queue_count": len(chrome_tasks)
+                })
+            elif parsed.path == "/api/chrome/sessions":
+                params = parse_qs(parsed.query)
+                is_audit = params.get("audit", [""])[0].strip() == "true"
+                
+                sess = self._get_current_session()
+                current_user_id = sess.get("user_id") if sess else None
+                current_display_name = sess.get("display_name") if sess else None
+                current_role = sess.get("role") if sess else "user"
+                
+                show_all = (current_role == "admin" and is_audit)
+
+                sessions_file = Path(config.project_root) / "data" / "chrome_sessions.json"
+                import json
+                sessions_list = []
+                if sessions_file.exists():
+                    try:
+                        with open(sessions_file, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                        for cid, info in data.get("sessions", {}).items():
+                            owner_id = info.get("user_id")
+                            owner_name = info.get("user_name")
+                            if not show_all:
+                                is_owner = (owner_id == current_user_id) or (not owner_id and owner_name == current_display_name)
+                                if not is_owner:
+                                    continue
+                            last_q = ""
+                            if info.get("turns"):
+                                for turn in reversed(info["turns"]):
+                                    if turn.get("role") == "user":
+                                        last_q = turn.get("content", "")
+                                        break
+                            sessions_list.append({
+                                "conversation_id": cid,
+                                "user_id": owner_id,
+                                "user_name": owner_name or "Unknown",
+                                "platform": info.get("platform", "chatgpt"),
+                                "cowork_platform": info.get("cowork_platform", ""),
+                                "notebook_id": info.get("notebook_id", ""),
+                                "notebook_title": info.get("notebook_title", ""),
+                                "created_at": info.get("created_at", ""),
+                                "last_query_at": info.get("last_query_at", ""),
+                                "last_question": last_q,
+                                "remark": info.get("remark", "")
+                            })
+                    except Exception:
+                        pass
+                sessions_list.sort(key=lambda x: x["last_query_at"], reverse=True)
+                self._send_json({"ok": True, "sessions": sessions_list})
+            elif parsed.path == "/api/chrome/history":
+                params = parse_qs(parsed.query)
+                conversation_id = params.get("conversation_id", [""])[0].strip()
+                if not conversation_id:
+                    self._send_json({"ok": False, "error": "Conversation ID is required."})
+                    return
+                sess = self._get_current_session()
+                current_user_id = sess.get("user_id") if sess else None
+                current_display_name = sess.get("display_name") if sess else None
+                current_role = sess.get("role") if sess else "user"
+
+                sessions_file = Path(config.project_root) / "data" / "chrome_sessions.json"
                 import json
                 turns = []
                 if sessions_file.exists():

@@ -1023,6 +1023,12 @@
       border: 1px solid hsla(272, 85%, 65%, 0.2);
     }
 
+    .badge-platform.chrome {
+      background: hsla(282, 85%, 65%, 0.1);
+      color: #c792ea;
+      border: 1px solid hsla(282, 85%, 65%, 0.2);
+    }
+
     .action-link {
       color: var(--active-accent);
       text-decoration: none;
@@ -1386,6 +1392,12 @@
           </svg>
           Gemini Web
         </button>
+        <button class="tab-btn" data-tab="chrome-ext">
+          <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.75z"/>
+          </svg>
+          Chrome Co-Work
+        </button>
         <button class="tab-btn" data-tab="converter">
           <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor">
             <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
@@ -1680,6 +1692,180 @@
                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
               </svg>
             </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- PAN 2.5: Chrome Co-Work Node Panel -->
+    <div class="tab-pane" id="pane-chrome-ext">
+      <div class="workspace-grid">
+        
+        <!-- Sidebar for Chrome extension status & sessions -->
+        <div class="sidebar-card">
+          <div class="sidebar-header">
+            <span>Chrome Node 狀態</span>
+            <span id="chrome-node-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #ff5370; display: inline-block; box-shadow: 0 0 6px #ff5370;"></span>
+          </div>
+          
+          <!-- Connection Info -->
+          <div style="background: rgba(0,0,0,0.15); border: 1px solid var(--card-border); padding: 10px; border-radius: 8px; font-size: 0.8rem; display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between;">
+              <span class="muted">連線狀態:</span>
+              <span id="chrome-status-text" style="color: #ff5370; font-weight: bold;">Disconnected</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span class="muted">地端 WS 埠口:</span>
+              <span style="font-family: monospace;" id="chrome-ws-port-display">8765</span>
+            </div>
+            <div id="chrome-extension-setup-hint" style="color: #ffcb6b; font-size: 0.72rem; line-height: 1.3; border-top: 1px dashed var(--card-border); padding-top: 6px; margin-top: 2px;">
+              ⚠️ 請在 Chrome 載入外掛資料夾 <code>v2/chrome-extension</code> 啟動長連線。
+            </div>
+          </div>
+          
+          <div class="sidebar-header" style="margin-top: 15px;">
+            <span>協作對話紀錄</span>
+            <button class="btn-action" style="padding: 4px 8px; font-size: 0.75rem;" onclick="loadChromeSessions()">🔄</button>
+          </div>
+          <div class="session-list" id="chrome-session-list">
+            <!-- Populated dynamically -->
+          </div>
+          
+          <!-- Queue Monitor -->
+          <div class="queue-monitor-section" style="border-top: 1px solid var(--card-border); padding-top: 15px; margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; display: flex; justify-content: space-between; align-items: center;">
+              <span>外掛排隊佇列</span>
+              <span id="chrome-queue-count" style="font-size: 0.75rem; background: var(--card-border); padding: 2px 6px; border-radius: 100px;">0</span>
+            </div>
+            <div id="chrome-queue-list" style="display: flex; flex-direction: column; gap: 6px; font-size: 0.8rem; max-height: 120px; overflow-y: auto;">
+              <div style="color: var(--text-muted); text-align: center; padding: 10px 0; font-size: 0.75rem;">佇列為空 🟢</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat main box -->
+        <div class="chat-container">
+          <div class="chat-header">
+            <div class="chat-title-area">
+              <span class="chat-title-main" id="chrome-chat-title">Chrome Agent Co-Work Portal</span>
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px;">
+                <span class="chat-subtitle" id="chrome-active-session-text" style="margin: 0;">Session: 新建立對話 (無記憶隔離狀態)</span>
+                <button id="chrome-copy-session-btn" class="btn-action" style="display: none; padding: 2px 6px; font-size: 0.68rem; border-radius: 4px; background: hsla(220, 20%, 15%, 0.6); border: 1px solid var(--card-border); color: var(--text-main); cursor: pointer;" onclick="copyActiveSessionId('chrome')">📋 複製 ID</button>
+                <button id="chrome-remark-session-btn" class="btn-action" style="display: none; padding: 2px 6px; font-size: 0.68rem; border-radius: 4px; background: hsla(280, 80%, 50%, 0.15); border-color: hsla(280, 80%, 50%, 0.3); color: hsl(280, 85%, 75%); cursor: pointer;" onclick="editActiveSessionRemark('chrome')">📝 備註</button>
+              </div>
+            </div>
+            
+            <div class="chat-actions">
+              <div class="cowork-mode-tabs" style="display: inline-flex; background: rgba(0,0,0,0.3); padding: 3px; border-radius: 8px; border: 1px solid var(--card-border); margin-right: 10px;">
+                <button class="cowork-tab-btn active" id="btn-mode-direct" onclick="setChromeMode('direct')" style="padding: 4px 10px; font-size: 0.78rem; border: none; border-radius: 6px; background: transparent; color: var(--text-muted); font-weight: bold; cursor: pointer;">直連模式</button>
+                <button class="cowork-tab-btn" id="btn-mode-cowork" onclick="setChromeMode('cowork')" style="padding: 4px 10px; font-size: 0.78rem; border: none; border-radius: 6px; background: transparent; color: var(--text-muted); font-weight: bold; cursor: pointer;">協作模式 (Co-work)</button>
+              </div>
+              <button class="btn-secondary-action" onclick="resetChromeChat()">
+                + 新開對話
+              </button>
+            </div>
+          </div>
+
+          <!-- Settings Toolbar -->
+          <div class="chat-setting-toolbar" style="display: flex; align-items: center; justify-content: flex-end; gap: 15px; padding: 8px 20px; background: rgba(0,0,0,0.25); border-bottom: 1px solid var(--card-border); font-size: 0.78rem; color: var(--text-muted);">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span>🔍 對話字體:</span>
+              <select class="chat-font-size-select" style="background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; outline: none; cursor: pointer;">
+                <option value="0.55rem">微小</option>
+                <option value="0.68rem">極小</option>
+                <option value="0.82rem">小</option>
+                <option value="0.95rem" selected>中 (預設)</option>
+                <option value="1.1rem">大</option>
+                <option value="1.25rem">特大</option>
+              </select>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span>🎨 配色:</span>
+              <select class="chat-theme-select" style="background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; outline: none; cursor: pointer;">
+                <option value="dark" selected>暗夜黑 (Obsidian)</option>
+                <option value="cyber">科技藍 (Cyberpunk)</option>
+                <option value="amber">琥珀金 (Amber Gold)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Chat messages area -->
+          <div class="chat-messages" id="chrome-chat-messages" style="flex: 1; overflow-y: auto; padding: 20px;">
+            <div class="chat-welcome" id="chrome-chat-welcome">
+              <span class="chat-welcome-icon">🔌</span>
+              <h3>Chrome 節點直連對話</h3>
+              <p>透過地端 Chrome 外掛控制真實瀏覽器分頁 (ChatGPT 或 Claude)，完美繞過 TLS 指紋阻斷、PoW 算力防禦及高強度驗證碼。請切換上方「協作模式」以啟動與 NotebookLM 的跨模組串聯！</p>
+            </div>
+          </div>
+
+          <!-- Typing Indicator -->
+          <div class="typing-indicator" id="chrome-typing-indicator" style="display: none; padding: 10px 20px; align-items: center; gap: 5px;">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <span id="chrome-typing-text" style="font-size: 0.75rem; color: var(--text-muted); margin-left: 8px;">外掛節點處理中...</span>
+          </div>
+
+          <!-- Co-work input panel (Visible only in Co-work mode) -->
+          <div id="chrome-cowork-input-panel" style="display: none; background: hsla(220, 20%, 6%, 0.5); border-top: 1px solid var(--card-border); padding: 15px; flex-direction: column; gap: 12px;">
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+              <div style="flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-size: 0.78rem; color: var(--text-muted); font-weight: bold;">📚 1. 選擇 NotebookLM 書庫:</label>
+                <select id="chrome-cowork-notebook-select" style="background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); border-radius: 6px; padding: 6px 10px; font-size: 0.78rem; outline: none; cursor: pointer; width: 100%;">
+                  <!-- Mirrored from nlm-notebook-select -->
+                </select>
+              </div>
+              <div style="flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-size: 0.78rem; color: var(--text-muted); font-weight: bold;">🤖 2. 選擇外掛協作平台:</label>
+                <select id="chrome-cowork-platform-select" style="background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); border-radius: 6px; padding: 6px 10px; font-size: 0.78rem; outline: none; cursor: pointer; width: 100%;">
+                  <option value="chatgpt" selected>ChatGPT (真實瀏覽器端)</option>
+                  <option value="claude">Claude.ai (真實瀏覽器端)</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 15px; flex-direction: column;">
+              <div style="display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-size: 0.78rem; color: #80cbc4; font-weight: bold;">🔍 NotebookLM 搜尋指令 (從上傳書庫定位知識):</label>
+                <textarea id="chrome-cowork-nlm-q" placeholder="例如：整理本季會議記錄中有關行銷預算與進度的關鍵內容..." style="background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); border-radius: 6px; padding: 8px 12px; font-size: 0.82rem; outline: none; resize: vertical; height: 60px; font-family: inherit;"></textarea>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-size: 0.78rem; color: #c792ea; font-weight: bold;">✍️ ChatGPT/Claude 協作指令 (將上述知識進一步精煉/潤色):</label>
+                <textarea id="chrome-cowork-ext-q" placeholder="例如：請將上述資料改寫為一封給總經理的匯報信函，口氣需正式，並用 Markdown 條列式整理預算超支風險..." style="background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); border-radius: 6px; padding: 8px 12px; font-size: 0.82rem; outline: none; resize: vertical; height: 60px; font-family: inherit;"></textarea>
+              </div>
+            </div>
+            
+            <div style="display: flex; justify-content: flex-end; margin-top: 5px;">
+              <button class="btn-send" onclick="triggerChromeSendConfirm()" id="chrome-cowork-send-btn" style="padding: 10px 24px; font-size: 0.85rem; border-radius: 8px; width: auto; font-weight: bold; background: linear-gradient(to right, #80cbc4, #c792ea); color: #000; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                🚀 啟動 AI 串聯協作
+              </button>
+            </div>
+          </div>
+
+          <!-- Direct input panel (Visible only in Direct mode) -->
+          <div id="chrome-direct-input-panel" style="display: flex; flex-direction: column; gap: 0;">
+            <!-- Model selector -->
+            <div class="chat-model-selector" style="display: flex; gap: 8px; padding: 10px 16px; background: hsla(220, 20%, 6%, 0.5); border-top: 1px solid var(--card-border); align-items: center;">
+              <label style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">🤖 平台分頁:</label>
+              <select id="chrome-direct-platform-select" style="background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); border-radius: 6px; padding: 5px 10px; font-size: 0.78rem; outline: none; cursor: pointer;">
+                <option value="chatgpt" selected>ChatGPT (chatgpt.com)</option>
+                <option value="claude">Claude.ai (claude.ai)</option>
+              </select>
+              <div style="font-size: 0.72rem; color: var(--text-muted); opacity: 0.8; margin-left: 10px;">
+                * 請確保 Chrome 已開啟並登入對應 the AI 分頁
+              </div>
+            </div>
+
+            <!-- Input bar -->
+            <div class="chat-input-bar">
+              <textarea class="chat-input-textarea" id="chrome-chat-input" placeholder="透過 Chrome 節點發送內容..." onkeydown="handleChatKey(event, 'chrome')"></textarea>
+              <button class="btn-send" onclick="triggerChromeSendConfirm()" id="chrome-direct-send-btn">
+                <svg viewBox="0 0 24 24">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -2225,9 +2411,10 @@
       // Load notebooks list for dropdown
       await loadNotebooks();
 
-      // Load NLM / Gemini session list
+      // Load NLM / Gemini / Chrome session list
       await loadNLMSessions();
       await loadGeminiSessions();
+      await loadChromeSessions();
 
       // Setup tab switcher
       setupTabSwitching();
@@ -2587,7 +2774,9 @@
     // Load notebooks list
     async function loadNotebooks() {
       const select = document.getElementById('nlm-notebook-select');
+      const coworkSelect = document.getElementById('chrome-cowork-notebook-select');
       select.innerHTML = '<option value="">-- 讀取 Notebooks 中... --</option>';
+      if (coworkSelect) coworkSelect.innerHTML = select.innerHTML;
 
       try {
         const res = await fetch('/api/notebooks?format=json');
@@ -2602,6 +2791,7 @@
             opt.innerText = `${nb.title} (${nb.total_sources} sources)`;
             select.appendChild(opt);
           });
+          if (coworkSelect) coworkSelect.innerHTML = select.innerHTML;
           
           // Auto select first
           onNotebookSelected();
@@ -2611,10 +2801,12 @@
           } else {
             select.innerHTML = '<option value="">-- 找不到筆記本；請檢查 storage_state.json 或手動輸入 ID --</option>';
           }
+          if (coworkSelect) coworkSelect.innerHTML = select.innerHTML;
         }
       } catch (err) {
         console.error("Failed to fetch notebooks", err);
         select.innerHTML = '<option value="">-- 連線失敗；請檢查後台運行 --</option>';
+        if (coworkSelect) coworkSelect.innerHTML = select.innerHTML;
       }
     }
 
@@ -2637,6 +2829,11 @@
         if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
           event.preventDefault();
           triggerGeminiSendConfirm();
+        }
+      } else if (platform === 'chrome') {
+        if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+          event.preventDefault();
+          triggerChromeSendConfirm();
         }
       }
     }
@@ -3422,6 +3619,488 @@
       }
     }
 
+    }
+
+    // --- Chrome Extension Co-Work Logic ---
+    let currentChromeSessionId = 'new';
+    let allChromeSessions = {};
+    let currentChromeMode = 'direct';
+
+    function setChromeMode(mode) {
+      currentChromeMode = mode;
+      document.querySelectorAll('.cowork-mode-tabs .cowork-tab-btn').forEach(btn => btn.classList.remove('active'));
+      
+      const directPanel = document.getElementById('chrome-direct-input-panel');
+      const coworkPanel = document.getElementById('chrome-cowork-input-panel');
+      const welcomeArea = document.getElementById('chrome-chat-welcome');
+      
+      if (mode === 'direct') {
+        document.getElementById('btn-mode-direct').classList.add('active');
+        if (directPanel) directPanel.style.display = 'flex';
+        if (coworkPanel) coworkPanel.style.display = 'none';
+        if (welcomeArea) {
+          welcomeArea.innerHTML = `
+            <span class="chat-welcome-icon">🔌</span>
+            <h3>Chrome 節點直連對話</h3>
+            <p>透過地端 Chrome 外掛控制真實瀏覽器分頁 (ChatGPT 或 Claude)，完美繞過 TLS 指紋阻斷、PoW 算力防禦及高強度驗證碼。請切換上方「協作模式」以啟動與 NotebookLM 的跨模組串聯！</p>
+          `;
+        }
+      } else {
+        document.getElementById('btn-mode-cowork').classList.add('active');
+        if (directPanel) directPanel.style.display = 'none';
+        if (coworkPanel) coworkPanel.style.display = 'flex';
+        if (welcomeArea) {
+          welcomeArea.innerHTML = `
+            <span class="chat-welcome-icon">🤝</span>
+            <h3>NotebookLM + ChatGPT/Claude 協作模式</h3>
+            <p><strong>自動化流程：</strong> 輸入搜尋指令定位書庫知識，AI 提取內容後，將自動派送至地端 Chrome 外掛，交由 ChatGPT 或 Claude 進行最終的改寫與精煉。產出更專業、格式更完美的報告！</p>
+          `;
+        }
+      }
+      resetChromeChat();
+    }
+
+    async function checkChromeNodeStatus() {
+      try {
+        const res = await fetch('/api/chrome/status');
+        const data = await res.json();
+        if (data.ok) {
+          const dot = document.getElementById('chrome-node-dot');
+          const text = document.getElementById('chrome-status-text');
+          const setupHint = document.getElementById('chrome-extension-setup-hint');
+          const displayPort = document.getElementById('chrome-ws-port-display');
+          
+          if (displayPort) {
+            displayPort.innerText = window.location.port || '8765';
+          }
+          
+          if (data.connected) {
+            if (dot) {
+              dot.style.background = '#c3e88d';
+              dot.style.boxShadow = '0 0 8px #c3e88d';
+            }
+            if (text) {
+              text.innerText = 'Connected 🟢';
+              text.style.color = '#c3e88d';
+            }
+            if (setupHint) setupHint.style.display = 'none';
+          } else {
+            if (dot) {
+              dot.style.background = '#ff5370';
+              dot.style.boxShadow = '0 0 6px #ff5370';
+            }
+            if (text) {
+              text.innerText = 'Disconnected 🔴';
+              text.style.color = '#ff5370';
+            }
+            if (setupHint) setupHint.style.display = 'block';
+          }
+          
+          const countEl = document.getElementById('chrome-queue-count');
+          if (countEl) countEl.innerText = data.queue_count;
+          
+          const listEl = document.getElementById('chrome-queue-list');
+          if (listEl) {
+            if (data.queue_count > 0) {
+              listEl.innerHTML = data.queue.map(t => `
+                <div style="background: rgba(255,255,255,0.05); padding: 5px 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                  <span>👤 ${t.user_name} (${t.platform})</span>
+                  <span style="color: #80cbc4; font-weight: bold;">${t.status === 'processing' ? '⚡ 處理中' : '⌛ 排隊中'}</span>
+                </div>
+              `).join('');
+            } else {
+              listEl.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 10px 0; font-size: 0.75rem;">佇列為空 🟢</div>';
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to check Chrome status", err);
+      }
+    }
+
+    // Start status polling
+    setInterval(checkChromeNodeStatus, 3000);
+    setTimeout(checkChromeNodeStatus, 500);
+
+    async function loadChromeSessions() {
+      try {
+        const res = await fetch('/api/chrome/sessions');
+        const data = await res.json();
+        if (data.ok && data.sessions) {
+          const list = document.getElementById('chrome-session-list');
+          list.innerHTML = '';
+          
+          data.sessions.forEach(sess => {
+            allChromeSessions[sess.conversation_id] = sess;
+
+            const item = document.createElement('div');
+            item.className = `session-item ${currentChromeSessionId === sess.conversation_id ? 'active' : ''}`;
+            item.setAttribute('id', `chrome-sess-${sess.conversation_id}`);
+            item.onclick = () => selectChromeSession(sess.conversation_id);
+
+            let displayTitle = sess.last_question || '(空對話)';
+            if (sess.platform === 'cowork') {
+              displayTitle = `🤝 協作: ${displayTitle}`;
+            }
+
+            item.innerHTML = `
+              <div class="session-title" title="${sess.last_question || '無提問內容'}">${displayTitle}</div>
+              ${sess.remark ? `<div class="session-remark-tag" style="font-size: 0.72rem; color: hsl(282, 80%, 75%); margin-top: 2px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHTML(sess.remark)}">📝 ${escapeHTML(sess.remark)}</div>` : ''}
+              <div class="session-meta">
+                <span>👤 ${sess.user_name} (${sess.platform === 'cowork' ? sess.cowork_platform : sess.platform})</span>
+                <span>📅 ${sess.last_query_at.split(' ')[1] || sess.last_query_at}</span>
+              </div>
+              <button class="delete-session-btn" onclick="deleteChromeSession(event, '${sess.conversation_id}')">🗑️</button>
+            `;
+            list.appendChild(item);
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load Chrome sessions", err);
+      }
+    }
+
+    async function deleteChromeSession(event, sessId) {
+      if (event) event.stopPropagation();
+      if (!confirm("確定要刪除此協作對話紀錄嗎？（此操作無法復原）")) return;
+
+      try {
+        const formData = new URLSearchParams();
+        formData.append('conversation_id', sessId);
+        const res = await fetch('/api/chrome/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: formData
+        });
+        const data = await res.json();
+        if (data.ok) {
+          if (currentChromeSessionId === sessId) {
+            resetChromeChat();
+          }
+          await loadChromeSessions();
+          if (typeof loadRemarksList === 'function') loadRemarksList();
+        }
+      } catch (err) {
+        console.error("Delete failed", err);
+      }
+    }
+
+    async function selectChromeSession(sessId) {
+      currentChromeSessionId = sessId;
+      
+      document.querySelectorAll('#chrome-session-list .session-item').forEach(item => {
+        item.classList.remove('active');
+      });
+      const activeItem = document.getElementById(`chrome-sess-${sessId}`);
+      if (activeItem) activeItem.classList.add('active');
+
+      document.getElementById('chrome-active-session-text').innerText = `Session ID: ${sessId}`;
+      document.getElementById('chrome-copy-session-btn').style.display = (sessId && sessId !== 'new') ? 'inline-block' : 'none';
+      document.getElementById('chrome-remark-session-btn').style.display = (sessId && sessId !== 'new') ? 'inline-block' : 'none';
+
+      const directInput = document.getElementById('chrome-chat-input');
+      const directBtn = document.getElementById('chrome-direct-send-btn');
+      const coworkNlmInput = document.getElementById('chrome-cowork-nlm-q');
+      const coworkExtInput = document.getElementById('chrome-cowork-ext-q');
+      const coworkBtn = document.getElementById('chrome-cowork-send-btn');
+      
+      if (directInput) directInput.disabled = false;
+      if (directBtn) directBtn.disabled = false;
+      if (coworkNlmInput) coworkNlmInput.disabled = false;
+      if (coworkExtInput) coworkExtInput.disabled = false;
+      if (coworkBtn) coworkBtn.disabled = false;
+
+      const messagesArea = document.getElementById('chrome-chat-messages');
+      messagesArea.innerHTML = '<div style="margin: auto;"><span class="spinner" style="color: #c792ea;"></span> 讀取對話歷史快取中...</div>';
+
+      try {
+        const res = await fetch(`/api/chrome/history?conversation_id=${sessId}`);
+        const data = await res.json();
+        
+        if (data.ok && data.turns) {
+          messagesArea.innerHTML = '';
+          data.turns.forEach(turn => {
+            appendMessageHTML(messagesArea, turn.role === 'user' ? 'user' : 'assistant', turn.content, turn.timestamp);
+            if (turn.nlm_answer) {
+              const details = document.createElement('details');
+              details.style.margin = '10px 0 20px 40px';
+              details.style.fontSize = '0.78rem';
+              details.style.color = 'var(--text-muted)';
+              details.style.background = 'rgba(255,255,255,0.03)';
+              details.style.border = '1px solid var(--card-border)';
+              details.style.borderRadius = '6px';
+              details.style.padding = '8px 12px';
+              details.innerHTML = `
+                <summary style="cursor: pointer; font-weight: bold; color: #80cbc4; outline: none;">🔍 查看 NotebookLM 原始檢索知識</summary>
+                <div style="margin-top: 6px; white-space: pre-wrap; font-family: monospace; line-height: 1.4; max-height: 200px; overflow-y: auto;">${escapeHTML(turn.nlm_answer)}</div>
+              `;
+              messagesArea.appendChild(details);
+            }
+          });
+          scrollToBottom(messagesArea);
+        } else {
+          messagesArea.innerHTML = `<div style="margin: auto; color: red;">載入失敗: ${data.error || '未知錯誤'}</div>`;
+        }
+      } catch (err) {
+        messagesArea.innerHTML = `<div style="margin: auto; color: red;">API 連線失敗: ${err.message}</div>`;
+      }
+    }
+
+    function resetChromeChat() {
+      currentChromeSessionId = 'new';
+      document.getElementById('chrome-active-session-text').innerText = "Session: 新建立對話 (無記憶隔離狀態)";
+      document.getElementById('chrome-copy-session-btn').style.display = 'none';
+      document.getElementById('chrome-remark-session-btn').style.display = 'none';
+      document.querySelectorAll('#chrome-session-list .session-item').forEach(item => item.classList.remove('active'));
+      
+      const directInput = document.getElementById('chrome-chat-input');
+      const directBtn = document.getElementById('chrome-direct-send-btn');
+      const coworkNlmInput = document.getElementById('chrome-cowork-nlm-q');
+      const coworkExtInput = document.getElementById('chrome-cowork-ext-q');
+      const coworkBtn = document.getElementById('chrome-cowork-send-btn');
+      
+      if (directInput) { directInput.disabled = false; directInput.value = ''; }
+      if (directBtn) directBtn.disabled = false;
+      if (coworkNlmInput) { coworkNlmInput.disabled = false; coworkNlmInput.value = ''; }
+      if (coworkExtInput) { coworkExtInput.disabled = false; coworkExtInput.value = ''; }
+      if (coworkBtn) coworkBtn.disabled = false;
+      
+      const messagesArea = document.getElementById('chrome-chat-messages');
+      if (currentChromeMode === 'direct') {
+        messagesArea.innerHTML = `
+          <div class="chat-welcome" id="chrome-chat-welcome">
+            <span class="chat-welcome-icon">🔌</span>
+            <h3>Chrome 節點直連對話</h3>
+            <p>透過地端 Chrome 外掛控制真實瀏覽器分頁 (ChatGPT 或 Claude)，完美繞過 TLS 指紋阻斷、PoW 算力防禦及高強度驗證碼。請切換上方「協作模式」以啟動與 NotebookLM 的跨模組串聯！</p>
+          </div>
+        `;
+      } else {
+        messagesArea.innerHTML = `
+          <div class="chat-welcome" id="chrome-chat-welcome">
+            <span class="chat-welcome-icon">🤝</span>
+            <h3>NotebookLM + ChatGPT/Claude 協作模式</h3>
+            <p><strong>自動化流程：</strong> 輸入搜尋指令定位書庫知識，AI 提取內容後，將自動派送至地端 Chrome 外掛，交由 ChatGPT 或 Claude 進行最終的改寫與精煉。產出更專業、格式更完美的報告！</p>
+          </div>
+        `;
+      }
+    }
+
+    function triggerChromeSendConfirm() {
+      const userName = document.getElementById('global-user-name').value.trim();
+      if (!userName) {
+        alert("請在右上角輸入您的同仁姓名，以供審計紀錄！");
+        return;
+      }
+
+      if (currentChromeMode === 'direct') {
+        const input = document.getElementById('chrome-chat-input');
+        const question = input.value.trim();
+        if (!question) return;
+
+        const platform = document.getElementById('chrome-direct-platform-select').value;
+        sendChromeMessage({
+          user_name: userName,
+          question: question,
+          platform: platform,
+          conversation_id: currentChromeSessionId
+        });
+      } else {
+        const nlmQ = document.getElementById('chrome-cowork-nlm-q').value.trim();
+        const extQ = document.getElementById('chrome-cowork-ext-q').value.trim();
+        const notebookSelect = document.getElementById('chrome-cowork-notebook-select');
+        const notebookId = notebookSelect.value;
+        const notebookTitle = notebookSelect.options[notebookSelect.selectedIndex]?.text || '';
+        const coworkPlatform = document.getElementById('chrome-cowork-platform-select').value;
+
+        if (!notebookId) {
+          alert("請選擇 NotebookLM 書庫！");
+          return;
+        }
+        if (!nlmQ) {
+          alert("請填寫 NotebookLM 搜尋指令！");
+          return;
+        }
+        if (!extQ) {
+          alert("請填寫 ChatGPT/Claude 協作指令！");
+          return;
+        }
+
+        sendChromeMessage({
+          user_name: userName,
+          question: nlmQ,
+          platform: 'cowork',
+          conversation_id: currentChromeSessionId,
+          cowork_prompt: extQ,
+          cowork_platform: coworkPlatform,
+          notebook_id: notebookId,
+          notebook_title: notebookTitle
+        });
+      }
+    }
+
+    async function sendChromeMessage(payload) {
+      const messagesArea = document.getElementById('chrome-chat-messages');
+      const welcome = messagesArea.querySelector('.chat-welcome');
+      if (welcome) welcome.remove();
+
+      const directInput = document.getElementById('chrome-chat-input');
+      const directBtn = document.getElementById('chrome-direct-send-btn');
+      const coworkNlmInput = document.getElementById('chrome-cowork-nlm-q');
+      const coworkExtInput = document.getElementById('chrome-cowork-ext-q');
+      const coworkBtn = document.getElementById('chrome-cowork-send-btn');
+
+      if (directInput) { directInput.disabled = true; directInput.value = ''; }
+      if (directBtn) directBtn.disabled = true;
+      if (coworkNlmInput) coworkNlmInput.disabled = true;
+      if (coworkExtInput) coworkExtInput.disabled = true;
+      if (coworkBtn) coworkBtn.disabled = true;
+
+      let displayUserQuery = payload.question;
+      if (payload.platform === 'cowork') {
+        displayUserQuery = `<strong>📚 NotebookLM 搜尋提問：</strong> ${payload.question}<br><strong style="color: #c792ea;">🤖 外掛協作處理指令：</strong> ${payload.cowork_prompt}`;
+      }
+      appendMessageHTML(messagesArea, 'user', displayUserQuery, getNowTimeString());
+      scrollToBottom(messagesArea);
+
+      const pendingBubble = document.createElement('div');
+      pendingBubble.className = 'message-bubble assistant';
+      pendingBubble.id = 'chrome-pending-bubble';
+      pendingBubble.innerHTML = `
+        <div class="message-content">
+          <span class="spinner" style="color: #c792ea;"></span> 
+          <span id="chrome-pending-status-text">正在排隊登記長連線佇列中，請稍候...</span>
+        </div>
+        <span class="message-meta">${getNowTimeString()}</span>
+      `;
+      messagesArea.appendChild(pendingBubble);
+      scrollToBottom(messagesArea);
+
+      const typingIndicator = document.getElementById('chrome-typing-indicator');
+      const typingText = document.getElementById('chrome-typing-text');
+      
+      if (typingIndicator) typingIndicator.style.display = 'flex';
+      if (typingText) {
+        typingText.innerText = payload.platform === 'cowork' 
+          ? "正在向 NotebookLM 檢索知識..." 
+          : "正在向 Chrome 節點 ChatGPT/Claude 進行自動化提問...";
+      }
+      scrollToBottom(messagesArea);
+
+      try {
+        const formData = new URLSearchParams();
+        Object.keys(payload).forEach(key => formData.append(key, payload[key]));
+
+        const res = await fetch('/api/chrome/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: formData
+        });
+        const result = await res.json();
+
+        if (result.ok) {
+          const taskId = result.task_id;
+          
+          const pollInterval = setInterval(async () => {
+            try {
+              const statusRes = await fetch(`/api/queue/status?task_id=${taskId}`);
+              const statusData = await statusRes.json();
+              
+              if (statusData.ok) {
+                if (statusData.status === 'pending') {
+                  pendingBubble.querySelector('#chrome-pending-status-text').innerText = `任務排隊中... 前方還有 ${statusData.queue_position} 人，預估剩餘 ${statusData.eta_seconds} 秒...`;
+                } else if (statusData.status === 'processing') {
+                  if (payload.platform === 'cowork') {
+                    if (statusData.result && statusData.result.nlm_answer) {
+                      pendingBubble.querySelector('#chrome-pending-status-text').innerHTML = `<span style="color: #80cbc4;">✓ NotebookLM 知識檢索完成！</span><br>正在透過 Chrome 節點 ChatGPT/Claude 進行協作潤飾中...`;
+                      if (typingText) typingText.innerText = "正在向 Chrome 節點 ChatGPT/Claude 進行協作處理...";
+                    } else {
+                      pendingBubble.querySelector('#chrome-pending-status-text').innerText = `正在向 NotebookLM 檢索知識中... (預估剩約 ${statusData.eta_seconds}s)`;
+                    }
+                  } else {
+                    pendingBubble.querySelector('#chrome-pending-status-text').innerText = `正在透過 Chrome 節點 ChatGPT/Claude 自動化提問中... (預估剩約 ${statusData.eta_seconds}s)`;
+                  }
+                } else if (statusData.status === 'completed') {
+                  clearInterval(pollInterval);
+                  if (typingIndicator) typingIndicator.style.display = 'none';
+                  
+                  const finalResult = statusData.result;
+                  pendingBubble.remove();
+                  
+                  appendMessageHTML(messagesArea, 'assistant', finalResult.answer, getNowTimeString());
+                  
+                  if (finalResult.nlm_answer) {
+                    const details = document.createElement('details');
+                    details.style.margin = '10px 0 20px 40px';
+                    details.style.fontSize = '0.78rem';
+                    details.style.color = 'var(--text-muted)';
+                    details.style.background = 'rgba(255,255,255,0.03)';
+                    details.style.border = '1px solid var(--card-border)';
+                    details.style.borderRadius = '6px';
+                    details.style.padding = '8px 12px';
+                    details.innerHTML = `
+                      <summary style="cursor: pointer; font-weight: bold; color: #80cbc4; outline: none;">🔍 查看 NotebookLM 原始檢索知識</summary>
+                      <div style="margin-top: 6px; white-space: pre-wrap; font-family: monospace; line-height: 1.4; max-height: 200px; overflow-y: auto;">${escapeHTML(finalResult.nlm_answer)}</div>
+                    `;
+                    messagesArea.appendChild(details);
+                  }
+                  scrollToBottom(messagesArea);
+                  
+                  currentChromeSessionId = finalResult.conversation_id;
+                  document.getElementById('chrome-active-session-text').innerText = `Session ID: ${currentChromeSessionId}`;
+                  document.getElementById('chrome-copy-session-btn').style.display = 'inline-block';
+                  document.getElementById('chrome-remark-session-btn').style.display = 'inline-block';
+
+                  if (directInput) directInput.disabled = false;
+                  if (directBtn) directBtn.disabled = false;
+                  if (coworkNlmInput) coworkNlmInput.disabled = false;
+                  if (coworkExtInput) coworkExtInput.disabled = false;
+                  if (coworkBtn) coworkBtn.disabled = false;
+
+                  await loadChromeSessions();
+                  if (typeof loadRemarksList === 'function') loadRemarksList();
+                } else if (statusData.status === 'failed') {
+                  clearInterval(pollInterval);
+                  if (typingIndicator) typingIndicator.style.display = 'none';
+                  pendingBubble.remove();
+                  
+                  appendMessageHTML(messagesArea, 'assistant', `❌ 處理失敗: ${statusData.error}`, getNowTimeString());
+                  scrollToBottom(messagesArea);
+                  
+                  if (directInput) directInput.disabled = false;
+                  if (directBtn) directBtn.disabled = false;
+                  if (coworkNlmInput) coworkNlmInput.disabled = false;
+                  if (coworkExtInput) coworkExtInput.disabled = false;
+                  if (coworkBtn) coworkBtn.disabled = false;
+                }
+              }
+            } catch (err) {
+              console.error("Polling status error", err);
+            }
+          }, 1000);
+        } else {
+          if (typingIndicator) typingIndicator.style.display = 'none';
+          if (pendingBubble) pendingBubble.remove();
+          appendMessageHTML(messagesArea, 'assistant', `❌ 佇列登記失敗: ${result.error}`, getNowTimeString());
+          if (directInput) directInput.disabled = false;
+          if (directBtn) directBtn.disabled = false;
+          if (coworkNlmInput) coworkNlmInput.disabled = false;
+          if (coworkExtInput) coworkExtInput.disabled = false;
+          if (coworkBtn) coworkBtn.disabled = false;
+          scrollToBottom(messagesArea);
+        }
+      } catch (err) {
+        if (typingIndicator) typingIndicator.style.display = 'none';
+        if (pendingBubble) pendingBubble.remove();
+        appendMessageHTML(messagesArea, 'assistant', `❌ 網路連線異常: ${err.message}`, getNowTimeString());
+        if (directInput) directInput.disabled = false;
+        if (directBtn) directBtn.disabled = false;
+        if (coworkNlmInput) coworkNlmInput.disabled = false;
+        if (coworkExtInput) coworkExtInput.disabled = false;
+        if (coworkBtn) coworkBtn.disabled = false;
+        scrollToBottom(messagesArea);
+      }
+    }
+
     // --- Centralized Session Remarks & Transcripts Manager ---
     let allRemarksSessions = [];
     let remarkModalTargetType = '';
@@ -3438,6 +4117,9 @@
 
         const resGemini = await fetch('/api/gemini/sessions');
         const dataGemini = await resGemini.json();
+
+        const resChrome = await fetch('/api/chrome/sessions');
+        const dataChrome = await resChrome.json();
 
         allRemarksSessions = [];
 
@@ -3469,6 +4151,24 @@
           });
         }
 
+        if (dataChrome.ok && dataChrome.sessions) {
+          dataChrome.sessions.forEach(s => {
+            let nId = `Chrome Node (${s.platform})`;
+            if (s.platform === 'cowork') {
+              nId = `🤝 Co-work (${s.cowork_platform}) · ${s.notebook_title || s.notebook_id}`;
+            }
+            allRemarksSessions.push({
+              platform: s.platform === 'cowork' ? 'chrome (cowork)' : `chrome (${s.platform})`,
+              user_name: s.user_name,
+              notebook_id: nId,
+              conversation_id: s.conversation_id,
+              last_query_at: s.last_query_at,
+              last_question: s.last_question,
+              remark: s.remark || ""
+            });
+          });
+        }
+
         // Sort descending by time
         allRemarksSessions.sort((a, b) => new Date(b.last_query_at.replace(/-/g, '/')) - new Date(a.last_query_at.replace(/-/g, '/')));
         renderRemarksTable(allRemarksSessions);
@@ -3489,16 +4189,25 @@
 
       logs.forEach(log => {
         const tr = document.createElement('tr');
-        const isNlm = log.platform === 'notebooklm';
+        
+        let pClass = 'gemini';
+        let pText = 'Gemini Web';
+        if (log.platform === 'notebooklm') {
+          pClass = 'nlm';
+          pText = 'NotebookLM';
+        } else if (log.platform.startsWith('chrome')) {
+          pClass = 'chrome';
+          pText = log.platform === 'chrome (cowork)' ? 'Co-Work 🤝' : `Chrome (${log.platform.replace('chrome (', '').replace(')', '')})`;
+        }
         
         tr.innerHTML = `
           <td>
-            <span class="badge-platform ${isNlm ? 'nlm' : 'gemini'}">
-              ${isNlm ? 'NotebookLM' : 'Gemini Web'}
+            <span class="badge-platform ${pClass}">
+              ${pText}
             </span>
           </td>
           <td style="font-weight:600;">${escapeHTML(log.user_name)}</td>
-          <td style="cursor:pointer;" onclick="openSessionRemarkModal('${log.platform}', '${log.conversation_id}')" title="點擊編輯備註">
+          <td style="cursor:pointer;" onclick="openSessionRemarkModal('${log.platform.startsWith('chrome') ? 'chrome' : log.platform}', '${log.conversation_id}')" title="點擊編輯備註">
             ${log.remark ? `<span style="color: hsl(282, 80%, 75%); font-weight:600; display:flex; align-items:center; gap:4px;">📝 ${escapeHTML(log.remark)}</span>` : `<span style="color:var(--text-muted); font-size:0.8rem;">+ 新增備註</span>`}
           </td>
           <td style="font-family:monospace; font-size:0.78rem;">
@@ -3508,8 +4217,8 @@
           <td>${log.last_query_at}</td>
           <td>
             <div style="display:flex; gap:8px;">
-              <button class="btn-secondary-action" style="padding:4px 8px; font-size:0.75rem;" onclick="viewTranscript('${log.platform}', '${log.conversation_id}', '${escapeHTML(log.user_name)}')">🔍 檢視對話</button>
-              <button class="btn-secondary-action" style="padding:4px 8px; font-size:0.75rem; background: hsla(280, 80%, 50%, 0.15); border-color: hsla(280, 80%, 50%, 0.3); color: hsl(280, 85%, 75%);" onclick="openSessionRemarkModal('${log.platform}', '${log.conversation_id}')">📝 編輯</button>
+              <button class="btn-secondary-action" style="padding:4px 8px; font-size:0.75rem;" onclick="viewTranscript('${log.platform.startsWith('chrome') ? 'chrome' : log.platform}', '${log.conversation_id}', '${escapeHTML(log.user_name)}')">🔍 檢視對話</button>
+              <button class="btn-secondary-action" style="padding:4px 8px; font-size:0.75rem; background: hsla(280, 80%, 50%, 0.15); border-color: hsla(280, 80%, 50%, 0.3); color: hsl(280, 85%, 75%);" onclick="openSessionRemarkModal('${log.platform.startsWith('chrome') ? 'chrome' : log.platform}', '${log.conversation_id}')">📝 編輯</button>
             </div>
           </td>
         `;
@@ -3646,14 +4355,21 @@
       const title = document.getElementById('modal-title-text');
       const body = document.getElementById('modal-body-content');
 
-      title.innerText = `對話明細 (${platform === 'notebooklm' ? 'NotebookLM' : 'Gemini'}) · 同仁: ${userName} · Session: ${conversationId}`;
+      let platformName = 'Gemini';
+      if (platform === 'notebooklm') platformName = 'NotebookLM';
+      else if (platform === 'chrome') platformName = 'Chrome Node / Co-Work';
+
+      title.innerText = `對話明細 (${platformName}) · 同仁: ${userName} · Session: ${conversationId}`;
       body.innerHTML = '<div style="margin:auto; padding:40px;"><span class="spinner" style="color:var(--active-accent);"></span> 正在讀取完整歷史紀錄...</div>';
       modal.style.display = 'flex';
 
       try {
-        const url = platform === 'notebooklm' 
-          ? `/api/multichat/history?conversation_id=${conversationId}`
-          : `/api/gemini/history?conversation_id=${conversationId}`;
+        let url = `/api/gemini/history?conversation_id=${conversationId}`;
+        if (platform === 'notebooklm') {
+          url = `/api/multichat/history?conversation_id=${conversationId}`;
+        } else if (platform === 'chrome') {
+          url = `/api/chrome/history?conversation_id=${conversationId}`;
+        }
 
         const res = await fetch(url);
         const data = await res.json();
@@ -3680,6 +4396,16 @@
               </div>
               <div style="font-size:0.9rem; line-height:1.6; white-space:pre-wrap; word-break:break-word;">${escapeHTML(turn.content)}</div>
             `;
+            
+            if (turn.nlm_answer) {
+              card.innerHTML += `
+                <details style="margin-top: 10px; font-size: 0.78rem; color: var(--text-muted); background: rgba(0,0,0,0.2); border: 1px solid var(--card-border); border-radius: 6px; padding: 6px 10px;">
+                  <summary style="cursor: pointer; font-weight: bold; color: #80cbc4; outline: none;">🔍 查看 NotebookLM 原始檢索知識</summary>
+                  <div style="margin-top: 6px; white-space: pre-wrap; font-family: monospace; line-height: 1.4; max-height: 150px; overflow-y: auto;">${escapeHTML(turn.nlm_answer)}</div>
+                </details>
+              `;
+            }
+            
             body.appendChild(card);
           });
         } else {

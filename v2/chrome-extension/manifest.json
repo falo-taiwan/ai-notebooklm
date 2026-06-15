@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Falo Co-Work Node",
+  "version": "1.0.0",
+  "description": "地端 Python 伺服器控制 Chrome 外掛代理人 (ChatGPT/Claude 協作節點)",
+  "overwrite": true,
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "power",
+    "storage"
+  ],
+  "host_permissions": [
+    "*://*.chatgpt.com/*",
+    "*://*.claude.ai/*",
+    "*://notebooklm.google.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.chatgpt.com/*",
+        "*://*.claude.ai/*",
+        "*://notebooklm.google.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Falo Co-Work Node"
+  }
+}

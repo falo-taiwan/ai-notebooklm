@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 300px;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #0f111a;
+      color: #a6accd;
+      padding: 15px;
+    }
+    h2 {
+      font-size: 1.1rem;
+      margin-top: 0;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid #232635;
+      padding-bottom: 8px;
+    }
+    .status-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #171925;
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      border: 1px solid #232635;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ff5370;
+    }
+    .status-dot.connected {
+      background: #c3e88d;
+      box-shadow: 0 0 8px #c3e88d;
+    }
+    .status-text {
+      font-weight: bold;
+      color: #fff;
+      font-size: 0.9rem;
+    }
+    .form-group {
+      margin-bottom: 12px;
+    }
+    label {
+      display: block;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      color: #80cbc4;
+      font-weight: bold;
+    }
+    input {
+      width: 100%;
+      background: #1e2030;
+      border: 1px solid #2d3149;
+      color: #fff;
+      padding: 8px;
+      border-radius: 4px;
+      box-sizing: border-box;
+      outline: none;
+      font-family: monospace;
+    }
+    input:focus {
+      border-color: #80cbc4;
+    }
+    button {
+      width: 100%;
+      background: #80cbc4;
+      color: #0f111a;
+      border: none;
+      padding: 8px;
+      border-radius: 4px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #a7dbd8;
+    }
+    .footer {
+      font-size: 0.7rem;
+      text-align: center;
+      margin-top: 15px;
+      color: #4e5579;
+      border-top: 1px solid #232635;
+      padding-top: 8px;
+    }
+    .hint {
+      font-size: 0.75rem;
+      color: #c792ea;
+      margin-top: 6px;
+      line-height: 1.3;
+    }
+  </style>
+</head>
+<body>
+  <h2>🤖 Falo Co-Work Node</h2>
+  
+  <div class="status-container">
+    <div class="status-dot" id="status-dot"></div>
+    <span class="status-text" id="status-text">Disconnected</span>
+  </div>
+
+  <div class="form-group">
+    <label for="server-port">Local Gateway Port</label>
+    <input type="number" id="server-port" value="8765" placeholder="8765">
+    <div class="hint">預設為 8765。若地端伺服器使用不同埠口，請在此修改。</div>
+  </div>
+
+  <button id="save-btn">儲存並重新連線</button>
+
+  <div class="footer">
+    © 2026 FALO x Force Cheng. Version 1.0.0
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
